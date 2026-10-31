@@ -1,0 +1,15 @@
+# Chỉ dùng với compose.yaml và project checkinapp-integration.
+services:
+  sqlserver:
+    ports: !override ["127.0.0.1:14333:1433"]
+    environment:
+      MSSQL_PID: Developer
+  redis:
+    ports: ["127.0.0.1:16379:6379"]
+    healthcheck:
+      test: ["CMD-SHELL", "REDISCLI_AUTH=$$REDIS_PASSWORD redis-cli ping | grep -q PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?Set REDIS_PASSWORD}

@@ -1,0 +1,46 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { Download, Upload, FileOutput } from 'lucide-react';
+import { api, can, fmtTime } from './api';
+import { Button, Modal, Table, Select } from './ui';
+export function download(blob, name) { const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(url), 10000); }
+export function ExcelActions({kind,user,classId,className,classes=[],onClassChange,yearId,refresh,toast}) {
+  const bits={students:[21,22],catechists:[23,24],classes:[25,26]}[kind];
+  const [busy,setBusy]=useState(false),[results,setResults]=useState(null),[overwriteExisting,setOverwriteExisting]=useState(false),[choice,setChoice]=useState(null),[error,setError]=useState(""),[importOpen,setImportOpen]=useState(false),[selectedFile,setSelectedFile]=useState(null),[targetClass,setTargetClass]=useState("");
+  const input=useRef(null),importClass=useRef(null);
+  if(!bits)return null;
+  const needsClass=kind==="students"&&!classId;
+  function run(action,id){setError("");if(action==="import"){setTargetClass(id||"");setSelectedFile(null);setOverwriteExisting(false);setImportOpen(true);}else exportFile(action==="template",id);}
+  function start(action){if(action==="import"){run(action,classId);return;}if(needsClass){setChoice({action,id:classes[0]?.id||""});return;}run(action,classId);}
+  async function exportFile(template,id){setBusy(true);setError("");try{const q=new URLSearchParams({template});if(kind==="students")q.set("classId",id);if(yearId&&kind==="classes")q.set("yearId",yearId);const label={students:"HocSinh",catechists:"GiaoLyVien",classes:"LopHoc"}[kind];download(await api(`/excel/${kind}?${q}`,{blob:true}),`CheckInApp-${label}${template?"-MauNhap":""}.xlsx`);}catch(e){setError(e.message);}finally{setBusy(false);}}
+  async function importFile(file){if(!file)return;const selectedClassId=importClass.current||classId;setError("");if(kind==="students"&&!selectedClassId){setError("Chọn lớp trước khi nhập học sinh.");return;}if(file.size>5000000||!file.name.toLowerCase().endsWith('.xlsx')){setError("Chọn file .xlsx tối đa 5 MB.");return;}setBusy(true);try{const base64=await new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result.split(',')[1]);r.onerror=reject;r.readAsDataURL(file);});const r=await api(`/excel/${kind}`,{method:'POST',body:{base64,overwriteExisting,...(kind==="classes"?{yearId}:{}),...(kind==="students"?{classId:selectedClassId}:{})}});setImportOpen(false);setResults(r.results);refresh();}catch(e){setError(e.message);}finally{setBusy(false);}}
+  return <><div className="excel-actions">
+    {can(user,bits[1])&&<Button disabled={busy} onClick={()=>start("export")}><FileOutput size={16}/>Xuất Excel</Button>}
+    {(can(user,bits[0])||can(user,bits[1]))&&<Button disabled={busy} onClick={()=>start("template")}><Download size={16}/>Tải mẫu Excel</Button>}
+    {can(user,bits[0])&&<Button disabled={busy} onClick={()=>start("import")}><Upload size={16}/>Nhập Excel</Button>}
+  </div>
+  {error&&!importOpen&&<p className="form-error excel-error" role="alert">{error}</p>}
+  {importOpen&&<Modal title="Nhập dữ liệu Excel" onClose={()=>{if(!busy){setImportOpen(false);setError("");}}}>
+    <p className="small muted">{kind==="students"?"Học sinh: Tên Thánh, Họ và tên đệm, Tên, Ngày sinh (dd/MM/yyyy).":kind==="catechists"?"Giáo lý viên: Tên Thánh, Họ và tên đệm, Tên.":"Lớp học: Mã lớp, Tên lớp. Áp dụng cho năm học đang chọn."} File .xlsx, tối đa 5 MB.</p>
+    {kind==="students"&&<div className="field"><label>Lớp nhận dữ liệu</label><Select label="Lớp nhận dữ liệu Excel" value={targetClass} options={[{value:"",label:"Chọn lớp"},...classes.map(c=>({value:c.id,label:c.name}))]} onChange={setTargetClass}/>{!classes.length&&<p className="small muted">Chưa có lớp trong năm học đang chọn.</p>}</div>}
+    <label className="field excel-file-field">Chọn file Excel<input className="input" type="file" accept=".xlsx" disabled={busy} onChange={e=>{setSelectedFile(e.target.files[0]||null);setError("");}}/></label>
+    <label className="row"><input type="checkbox" className="check" checked={overwriteExisting} disabled={busy} onChange={e=>setOverwriteExisting(e.target.checked)}/>Chép đè dữ liệu đã có</label>
+    <p className="small muted">Không chọn chép đè: bỏ qua dòng đã tồn tại. Các dòng mới vẫn được thêm.</p>
+    {error&&<p className="form-error" role="alert">{error}</p>}
+    <div className="modal-actions"><Button disabled={busy} onClick={()=>{setImportOpen(false);setError("");}}>Hủy</Button><Button primary disabled={busy||!selectedFile||(kind==="students"&&!targetClass)} onClick={()=>{importClass.current=targetClass;if(kind==="students")onClassChange?.(targetClass);importFile(selectedFile);}}><Upload size={16}/>{busy?"Đang nhập…":"Nhập dữ liệu"}</Button></div>
+  </Modal>}
+  {choice&&<Modal title="Chọn lớp cho file Excel học sinh" onClose={()=>setChoice(null)}>{classes.length?<><p>File sẽ áp dụng cho lớp bạn chọn dưới đây.</p><Select label="Lớp nhận dữ liệu Excel" value={choice.id} options={classes.map(c=>({value:c.id,label:c.name}))} onChange={id=>setChoice({...choice,id})}/><div className="modal-actions"><Button onClick={()=>setChoice(null)}>Hủy</Button><Button primary disabled={!choice.id} onClick={()=>{const {action,id}=choice;onClassChange?.(id);setChoice(null);run(action,id);}}>Tiếp tục</Button></div></>:<p>Chưa có lớp trong năm học đang chọn. Hãy chọn năm học có lớp hoặc tạo lớp trước, rồi thử lại.</p>}</Modal>}
+  {results&&<Modal wide title="Kết quả nhập Excel" onClose={()=>setResults(null)}><p>{results.filter(x=>x.success&&!x.skipped).length} dòng đã lưu · {results.filter(x=>x.skipped).length} dòng bỏ qua · {results.filter(x=>!x.success).length} dòng lỗi. Chỉ nhập lại các dòng lỗi.</p><Table rows={results} rowKey="row" columns={[{label:'Dòng Excel',key:'row'},{label:'Kết quả',render:r=>r.skipped?'Bỏ qua':r.success?'Thành công':'Lỗi'},{label:'Chi tiết',key:'message'}]}/></Modal>}</>;
+}
+const localValue = s => s ? new Date(new Date(s.endsWith('Z') ? s : s+'Z').getTime()+7*3600000).toISOString().slice(0,16) : '';
+export function PresencePanel({ session, students, user, refresh, toast }) {
+  const [teachers,setTeachers]=useState([]),[edit,setEdit]=useState(null),[busy,setBusy]=useState(false),[error,setError]=useState('');
+  async function load(){ try { setTeachers((await api(`/attendance-sessions/${session.id}/catechists`)).items);setError(''); } catch(e){setError(e.message);} }
+  useEffect(()=>{load();},[session.id,students]);
+  function open(person,teacher){ const r=teacher?person.record:person; setEdit({name:person.fullName,id:teacher?person.id:person.studentId,teacher,version:r?.version||null,in:localValue(teacher?r?.checkedInAtUtc:r?.recordedAtUtc)||`${String(session.date).slice(0,10)}T09:00`,out:localValue(r?.checkedOutAtUtc),reason:''}); }
+  async function save(e){e.preventDefault();setBusy(true);try{await api(`/attendance-sessions/${session.id}/times/${edit.id}?teacher=${edit.teacher}`,{method:'PUT',body:{checkedInAtUtc:new Date(edit.in+':00+07:00').toISOString(),checkedOutAtUtc:edit.out?new Date(edit.out+':00+07:00').toISOString():null,version:edit.version,reason:edit.reason}});setEdit(null);refresh();await load();toast('Đã lưu giờ vào/ra và nhật ký.');}catch(e){toast(e.message);}finally{setBusy(false);}}
+  return <section className="card" style={{marginTop:24}}><h2>Giờ vào / ra và điểm danh giáo lý viên</h2>{error && <p role="alert">{error}</p>}
+    {session.studentAttendanceEnabled !== false && <><h3>Học sinh đã điểm danh</h3><Table rows={students.filter(s=>s.present)} rowKey="studentId" columns={[{label:'Học sinh',key:'fullName'},{label:'Giờ vào',render:r=>fmtTime(r.recordedAtUtc)},{label:'Giờ ra',render:r=>fmtTime(r.checkedOutAtUtc)},{label:'',render:r=>can(user,12)&&<Button onClick={()=>open(r,false)}>Điều chỉnh giờ</Button>}]} /></>}
+    {session.catechistAttendanceEnabled !== false && <><h3>Giáo lý viên phụ trách buổi học</h3><Table rows={teachers} columns={[{label:'Giáo lý viên',key:'fullName'},{label:'Giờ vào',render:r=>fmtTime(r.record?.checkedInAtUtc)},{label:'Giờ ra',render:r=>fmtTime(r.record?.checkedOutAtUtc)},{label:'',render:r=>can(user,27)&&<Button onClick={()=>open(r,true)}>{r.record?'Điều chỉnh giờ':'Điểm danh'}</Button>}]} />{!teachers.length && <p className="muted">Chưa có giáo lý viên được phân công trong ngày học này.</p>}</>}
+    {edit && <Modal title={edit.name+' — Giờ vào / ra'} onClose={()=>setEdit(null)}><form onSubmit={save}><label className="field">Giờ vào (Việt Nam)<input className="input" required type="datetime-local" value={edit.in} onChange={e=>setEdit({...edit,in:e.target.value})}/></label><label className="field">Giờ ra (để trống nếu chưa ra)<input className="input" type="datetime-local" value={edit.out} min={edit.in} onChange={e=>setEdit({...edit,out:e.target.value})}/></label><label className="field">Lý do / ghi chú<input className="input" required maxLength={500} value={edit.reason} onChange={e=>setEdit({...edit,reason:e.target.value})}/></label><div className="modal-actions"><Button onClick={()=>setEdit(null)}>Hủy</Button><Button type="submit" primary disabled={busy}>Lưu</Button></div></form></Modal>}
+  </section>;
+}

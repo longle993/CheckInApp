@@ -1,0 +1,16 @@
+import {chromium} from 'file:///C:/Users/Admin/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs';
+import fs from 'node:fs/promises';import assert from 'node:assert/strict';
+const secrets=JSON.parse((await fs.readFile('.local/docker-integration/secrets.json','utf8')).replace(/^\uFEFF/,'')),fixture=JSON.parse(await fs.readFile('.local/ui-qa/student-template-fixture.json','utf8'));
+const browser=await chromium.launch({channel:'chrome'}),page=await browser.newPage({viewport:{width:1440,height:1000}}),errors=[];page.on('pageerror',e=>errors.push(e.message));
+try{
+ await page.goto('http://127.0.0.1:5175/');await page.getByLabel('Email').fill(secrets.email);await page.getByLabel('Mật khẩu').fill(secrets.password);await page.getByRole('button',{name:'Đăng nhập',exact:true}).click();await page.getByRole('heading',{name:'Điểm danh hôm nay',exact:true}).waitFor();
+ await page.getByLabel('Năm học',{exact:true}).selectOption(fixture.yearId);await page.evaluate(()=>location.hash='hocsinh');assert.equal(await page.getByRole('button',{name:'Nhập Excel',exact:true}).isEnabled(),true);
+ await page.getByLabel('Lớp học',{exact:true}).selectOption(fixture.classId);assert.equal(await page.locator('input[type=file]').isDisabled(),false);
+ const uploaded=page.waitForResponse(r=>r.url().includes('/excel/students')&&r.request().method()==='POST');await page.locator('input[type=file]').setInputFiles('.local/ui-qa/student-template-input.xlsx');const upload=await uploaded;assert.equal(upload.request().postDataJSON().classId,fixture.classId);assert.equal((await upload.json()).results[0].success,true);
+ const modal=page.locator('section[aria-modal=true]');await modal.waitFor();await modal.getByRole('button',{name:'Đóng',exact:true}).click();
+ const family='Trần Văn UI '+fixture.familyName.split(' ').at(-1),row=page.locator('tr').filter({hasText:family});await row.waitFor();await page.getByRole('columnheader',{name:'Họ và tên đệm',exact:true}).waitFor();await page.getByRole('columnheader',{name:'Tên',exact:true}).waitFor();assert.equal(await row.getByRole('cell',{name:'Bảo',exact:true}).count(),1);
+ await row.getByRole('button',{name:'Chỉnh sửa',exact:true}).click();assert.equal(await modal.getByLabel('Họ và tên đệm',{exact:true}).inputValue(),family);assert.equal(await modal.locator('#edit-givenName').inputValue(),'Bảo');await modal.locator('#edit-givenName').fill('Khánh');await modal.getByRole('button',{name:'Lưu',exact:true}).click();await modal.waitFor({state:'hidden'});await row.getByRole('cell',{name:'Khánh',exact:true}).waitFor();
+ await row.getByRole('button',{name:'Cấp thẻ',exact:true}).click();await modal.waitFor();assert.ok((await page.locator('#print-card').innerText()).includes(family+' Khánh'));await page.screenshot({path:'.local/ui-qa/student-split-name-card.png'});await modal.getByRole('button',{name:'Đóng',exact:true}).last().click();
+ await page.setViewportSize({width:375,height:800});await page.screenshot({path:'.local/ui-qa/student-split-name-mobile.png'});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+2));
+ assert.deepEqual(errors,[]);console.log('PASS: implicit class in Excel upload; enabled without class with chooser flow; split columns and form; full name on card; responsive 375px; no JS errors.');
+}finally{await browser.close();}

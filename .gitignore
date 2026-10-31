@@ -1,0 +1,12 @@
+**/bin/
+**/obj/
+**/node_modules/
+**/dist/
+**/.expo/
+**/.local/
+**/*.db*
+.env
+.env.local
+playwright-report/
+test-results/
+NVIDIA Corporation/

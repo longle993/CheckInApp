@@ -1,0 +1,346 @@
+.live-app {
+  min-height: 100vh;
+}
+.topbar {
+  height: 64px;
+  min-height: 64px;
+  padding: 10px 24px;
+}
+@media (max-width: 767px) {
+  .topbar {
+    padding: 9px 16px;
+  }
+}
+.select-control {
+  position: relative;
+}
+.select-trigger {
+  width: 100%;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  padding: 8px 12px;
+  background: var(--surface);
+  color: var(--foreground);
+  font-size: 14px;
+  white-space: nowrap;
+}
+.select-trigger:focus,
+.select-trigger[aria-expanded="true"] {
+  outline: none;
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 2px var(--ring-focus);
+}
+.select-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 49;
+  background: transparent;
+  border: 0;
+  cursor: default;
+}
+.select-control .popover,
+.datepicker .popover {
+  z-index: 50;
+}
+.popover .selected {
+  background: var(--secondary);
+  font-weight: 500;
+}
+.calendar-pop {
+  min-width: 300px;
+  padding: 12px;
+}
+.dategrid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+  text-align: center;
+}
+.dategrid > button {
+  padding: 4px;
+  min-width: 32px;
+  min-height: 32px;
+  justify-content: center;
+}
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: #0006;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.modal {
+  width: 100%;
+  max-width: 600px;
+  max-height: calc(100vh - 48px);
+  overflow: auto;
+  background: var(--surface);
+  padding: 24px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  box-shadow: var(--elevation-modal);
+}
+.modal.wide {
+  max-width: 900px;
+}
+.modal form {
+  margin-top: 20px;
+}
+.modal-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 24px;
+}
+.field em,
+em {
+  font-style: normal;
+  color: var(--error-text);
+}
+.form-error {
+  padding: 12px 0;
+  color: var(--error-strong);
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.form-success {
+  color: var(--success);
+  padding: 12px 0;
+}
+.permission-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+  margin-top: 24px;
+}
+.permission-grid label {
+  overflow-wrap: anywhere;
+}
+.day-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.day-options label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.live-video {
+  height: 100%;
+  width: 100%;
+  object-fit: cover;
+  position: absolute;
+  inset: 0;
+}
+.credential-card {
+  text-align: center;
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  gap: 16px;
+  margin: 24px 0;
+}
+.credential-card > svg:last-child {
+  width: 100%;
+  height: 90px;
+}
+.report-person {
+  padding: 16px 0;
+  border-bottom: 1px solid var(--border);
+}
+.report-person summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.date-results {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 16px;
+}
+.danger {
+  background: var(--danger-bg);
+  color: var(--danger);
+  border: 0;
+}
+.danger:hover {
+  background: var(--danger-bg-hover);
+}
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.camera svg {
+  width: 68px;
+  height: 68px;
+}
+.profile .btn {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.profile {
+  gap: 8px;
+}
+.profile strong {
+  overflow-wrap: anywhere;
+}
+.topbar > .filter {
+  min-width: 150px;
+}
+.auth .btn.ghost {
+  margin-top: 12px;
+}
+.report-person strong {
+  overflow-wrap: anywhere;
+}
+html {
+  scrollbar-gutter: stable;
+}
+.sidebar {
+  position: sticky;
+  top: 0;
+  align-self: flex-start;
+  height: 100vh;
+  overflow: auto;
+}
+.table-wrap {
+  overflow-x: auto;
+}
+.popover button {
+  flex-shrink: 0;
+}
+.dategrid .selected {
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+@media (max-width: 767px) {
+  .select-trigger {
+    height: 44px;
+    font-size: 16px;
+  }
+  .modal-backdrop {
+    padding: 16px;
+  }
+  .modal {
+    padding: 20px;
+    max-height: calc(100dvh - 32px);
+  }
+  .permission-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .sidebar {
+    position: relative;
+    top: auto;
+    height: 100%;
+  }
+  .topbar {
+    min-height: 64px;
+  }
+  .table-wrap .adaptive td:first-child {
+    position: static;
+  }
+  .report-person summary {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .manual-input .btn {
+    min-height: 44px;
+  }
+  .auth .input {
+    height: 44px;
+  }
+  .modal .formgrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #print-card,
+  #print-card * {
+    visibility: visible;
+  }
+  #print-card {
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 160mm;
+    margin: 0;
+    padding: 12mm;
+    background: white;
+  }
+  .modal-backdrop,
+  .modal {
+    position: static;
+    background: white;
+    box-shadow: none;
+    border: none;
+    overflow: visible;
+  }
+  .modal-actions {
+    display: none;
+  }
+}
+@media (max-width: 767px) {
+  .content .filters > .filter {
+    flex: 1 0 100%;
+    width: 100%;
+    min-width: 0;
+  }
+  .select-trigger {
+    min-width: 0;
+  }
+  .content .filters > .badge {
+    flex-basis: auto;
+  }
+}
+
+/* Physical student card, identical sizing on screen and print. */
+.student-card { box-sizing:border-box; width:86mm; height:50mm; padding:3mm; border:1px solid var(--border); background:white; color:#111; display:flex; align-items:center; gap:2mm; margin:16px auto; overflow:hidden; }
+.student-card .card-information { flex:1; min-width:0; }
+.student-card .card-information strong { font-size:7pt; }
+.student-card h3 { font-size:11pt; line-height:1.15; margin:1mm 0; overflow-wrap:anywhere; }
+.student-card p { font-size:7.5pt; line-height:1.2; margin:.6mm 0; overflow-wrap:anywhere; }
+.student-card.qr .card-symbol { flex:0 0 27mm; }
+.student-card.qr svg { width:27mm; height:27mm; }
+.student-card.barcode { flex-direction:column; align-items:stretch; gap:0; }
+.student-card.barcode .card-information { display:grid; grid-template-columns:1fr 1fr; gap:0 2mm; }
+.student-card.barcode h3,.student-card.barcode strong { grid-column:1/-1; }
+.student-card.barcode .card-symbol { height:12mm; flex-shrink:0; }
+.student-card.barcode svg { width:100%; height:12mm; }
+.select-trigger { max-width:100%; text-overflow:ellipsis; }
+@media print {
+  @page { size:86mm 50mm; margin:0; }
+  body:has(#print-card) *:not(:has(#print-card)):not(#print-card):not(#print-card *) { display:none!important; }
+  #print-card.student-card { width:86mm!important; height:50mm!important; padding:3mm!important; border:0; margin:0!important; print-color-adjust:exact; }
+}
+
+.catalog-pagination { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:16px; }
+.catalog-pagination > .select-control { width:88px; flex:none; }
+.catalog-pagination nav { gap:6px; }
+
+.filters .excel-actions { display:flex; gap:8px; margin-left:auto; flex-wrap:wrap; align-items:center; }
+.excel-actions .btn { white-space:nowrap; }
+.excel-error { flex-basis:100%; }
+.excel-file-field { margin:20px 0; }
+.excel-file-field input[type=file] { height:auto; padding:12px; }
+@media(max-width:767px) { .filters .excel-actions { margin-left:0; width:100%; } .excel-actions .btn { flex:1 1 auto; } }
+@media(max-width:767px) { .calendar-row > .row { grid-column:2; justify-self:start; } }
+
