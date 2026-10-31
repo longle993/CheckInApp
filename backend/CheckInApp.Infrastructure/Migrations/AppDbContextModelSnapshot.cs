@@ -196,8 +196,7 @@ namespace CheckInApp.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ClassRoomId")
-                        .IsUnique();
+                    b.HasIndex("ClassRoomId");
 
                     b.ToTable("Schedules");
                 });
@@ -228,8 +227,14 @@ namespace CheckInApp.Infrastructure.Migrations
                     b.Property<DateTime>("OpensAtUtc")
                         .HasColumnType("datetime2");
 
+                    b.Property<Guid?>("ScheduleId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<int>("ScheduleVersion")
                         .HasColumnType("int");
+
+                    b.Property<DateOnly?>("SourceDate")
+                        .HasColumnType("date");
 
                     b.Property<bool>("StudentAttendanceEnabled")
                         .ValueGeneratedOnAdd()
@@ -242,7 +247,7 @@ namespace CheckInApp.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ClassRoomId", "Date")
+                    b.HasIndex("ClassRoomId", "Date", "OpensAtUtc")
                         .IsUnique();
 
                     b.ToTable("Sessions");
@@ -581,6 +586,9 @@ namespace CheckInApp.Infrastructure.Migrations
                     b.Property<DateOnly>("Date")
                         .HasColumnType("date");
 
+                    b.Property<DateOnly?>("MovedToDate")
+                        .HasColumnType("date");
+
                     b.Property<TimeOnly>("OpensAt")
                         .HasColumnType("time");
 
@@ -589,6 +597,9 @@ namespace CheckInApp.Infrastructure.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
 
+                    b.Property<Guid?>("ScheduleId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<bool>("StudentAttendanceEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("bit")
@@ -596,8 +607,9 @@ namespace CheckInApp.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ClassRoomId", "Date")
-                        .IsUnique();
+                    b.HasIndex("ClassRoomId", "ScheduleId", "Date")
+                        .IsUnique()
+                        .HasFilter("[ScheduleId] IS NOT NULL");
 
                     b.ToTable("Exceptions");
                 });

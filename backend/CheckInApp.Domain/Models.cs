@@ -9,7 +9,8 @@ public enum Permission : long
     AttendanceCorrect = 1L << 12, ReportView = 1L << 13, UserView = 1L << 14, UserApprove = 1L << 15,
     RoleManage = 1L << 16, CredentialManage = 1L << 17, AssignmentManage = 1L << 18, AuditView = 1L << 19, UserCreate = 1L << 20,
     StudentImport = 1L << 21, StudentExport = 1L << 22, CatechistImport = 1L << 23, CatechistExport = 1L << 24,
-    ClassImport = 1L << 25, ClassExport = 1L << 26, CatechistAttendance = 1L << 27
+    ClassImport = 1L << 25, ClassExport = 1L << 26, CatechistAttendance = 1L << 27,
+    WebSettingsView = 1L << 28, WebSettingsManage = 1L << 29
 }
 public enum AccountStatus
 {
@@ -139,6 +140,8 @@ public class AttendanceSchedule : Entity
 }
 public class ScheduleException : Entity
 {
+    public Guid? ScheduleId { get; set; }
+    public DateOnly? MovedToDate { get; set; }
     public bool StudentAttendanceEnabled { get; set; } = true;
     public bool CatechistAttendanceEnabled { get; set; } = true;
     public Guid ClassRoomId
@@ -165,6 +168,8 @@ public class ScheduleException : Entity
 }
 public class AttendanceSession : Entity
 {
+    public Guid? ScheduleId { get; set; }
+    public DateOnly? SourceDate { get; set; }
     public bool StudentAttendanceEnabled { get; set; } = true;
     public bool CatechistAttendanceEnabled { get; set; } = true;
     public Guid ClassRoomId

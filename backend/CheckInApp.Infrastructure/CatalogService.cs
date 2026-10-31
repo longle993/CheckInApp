@@ -187,7 +187,9 @@ public class CatalogService(AppDbContext db, AccessService access, ScheduleServi
                 await access.Require(c.ActorId, Permission.ScheduleManage, ct);
                 var sid = Id(d, "classRoomId");
                 await access.Class(c.ActorId, sid, ct);
-                var sc = await db.Schedules.SingleOrDefaultAsync(x => x.ClassRoomId == sid, ct);
+                await schedules.LockClass(sid,ct);
+                var sc = c.Id==null?null:await db.Schedules.SingleOrDefaultAsync(x => x.Id==c.Id && x.ClassRoomId == sid, ct);
+                if(c.Id!=null&&sc==null)throw Missing();
                 var isNew = sc == null;
                 sc ??= new()
                 {
@@ -219,18 +221,21 @@ public class CatalogService(AppDbContext db, AccessService access, ScheduleServi
                 var eid = Id(d, "classRoomId");
                 await access.Class(c.ActorId, eid, ct);
                 var edate = Date(d, "date");
-                var exists = await db.Sessions.SingleOrDefaultAsync(x => x.ClassRoomId == eid && x.Date == edate, ct);
+                var exceptionScheduleId=d.TryGetProperty("scheduleId",out var sp)&&Guid.TryParse(sp.GetString(),out var parsedSchedule)?(Guid?)parsedSchedule:null;
+                await schedules.LockClass(eid,ct);
+                var exists = await db.Sessions.Where(x => x.ClassRoomId == eid && (x.SourceDate??x.Date) == edate && (exceptionScheduleId==null||x.ScheduleId==exceptionScheduleId)).OrderBy(x=>x.OpensAtUtc).FirstOrDefaultAsync(ct);
                 if (edate < today || (exists != null && exists.OpensAtUtc <= clock.GetUtcNow().UtcDateTime))
                     throw Invalid("Không thay ngoại lệ cho buổi đã bắt đầu hoặc quá khứ.");
-                var sch = await db.Schedules.SingleOrDefaultAsync(x => x.ClassRoomId == eid, ct) ?? throw Invalid("Cần cấu hình lịch trước.");
+                var sch = await db.Schedules.Where(x => x.ClassRoomId == eid && (exceptionScheduleId==null||x.Id==exceptionScheduleId)).OrderBy(x=>x.OpensAt).FirstOrDefaultAsync(ct) ?? throw Invalid("Cần cấu hình lịch trước.");
                 if (edate < sch.From || edate > sch.Until)
                     throw Invalid("Ngày ngoại lệ ngoài khoảng lịch.");
-                var ex = await db.Exceptions.SingleOrDefaultAsync(x => x.ClassRoomId == eid && x.Date == edate, ct);
+                var ex = await db.Exceptions.SingleOrDefaultAsync(x => x.ClassRoomId == eid && x.ScheduleId==sch.Id && x.Date == edate, ct);
                 if (ex == null)
                 {
                     ex = new()
                     {
                         ClassRoomId = eid,
+                        ScheduleId=sch.Id,
                         Date = edate
                     };
                     db.Exceptions.Add(ex);

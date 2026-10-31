@@ -1,3 +1,5 @@
+> **Cập nhật 01/11:** Đã triển khai toàn bộ đợt thay đổi. Xem [hướng dẫn và bằng chứng mới](release-2026-11-01.md). Nội dung bên dưới ghi lại các mốc cũ; đặc tả 01/11 được ưu tiên.
+
 # Kiểm tra bản MVP
 
 Ngày kiểm tra: 27/10/2026. Môi trường Windows, .NET 10, SQLite Development, Chromium và Node 24.

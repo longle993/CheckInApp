@@ -22,5 +22,5 @@ $env:Bootstrap__AdminEmail = $integrationSecrets.email
 $env:Bootstrap__AdminPassword = $integrationSecrets.password
 $env:SeedDemoData = 'false'
 [Environment]::SetEnvironmentVariable('Logging__LogLevel__Microsoft.EntityFrameworkCore', 'Warning', 'Process')
-$env:API_URL = 'http://127.0.0.1:5082/api/v1'
+$env:API_URL = 'http://127.0.0.1:5083/api/v1'
 $env:BOOTSTRAP_FILE = $integrationSecretsPath

@@ -1,6 +1,6 @@
 param([string]$ApiUrl)
 $ErrorActionPreference = 'Stop'
-if (!$ApiUrl) { $ApiUrl = 'http://' + (& "$PSScriptRoot/Get-LanAddress.ps1") + ':5082/api/v1' }
+if (!$ApiUrl) { $ApiUrl = 'https://longle993.io.vn/api/v1' }
 $androidBuildRoot = Split-Path $PSScriptRoot -Parent
 $androidOutput = Join-Path $androidBuildRoot '.local/android-preview'
 New-Item -ItemType Directory -Force -Path $androidOutput | Out-Null

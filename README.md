@@ -1,10 +1,12 @@
 # CheckInApp
 
-Chạy bản web và APK mới nhất: [hướng dẫn chạy bản build 28/10/2026](docs/run-built-app.md).
+Đặc tả hợp nhất và yêu cầu mới: [nghiệp vụ + brief ngày 01/11/2026](docs/requirements-2026-11-01.md). Đã triển khai đợt 01/11; xem kết quả và giới hạn trong hướng dẫn mới.
 
-Ứng dụng quản lý lớp giáo lý và điểm danh: web quản trị theo phương án **A**, mobile điểm danh theo phương án **C**. Giao diện tiếng Việt, Inter, nền sáng, màu nhấn chàm. Web gọi API thật; không dùng dữ liệu giả hardcode trong React.
+Chạy bản web và APK mới nhất: [hướng dẫn bản cập nhật 01/11/2026](docs/release-2026-11-01.md).
 
-SQL Server và Redis Docker đã được kiểm thử thực tế. Bản web tích hợp: http://127.0.0.1:5174. Xem [hướng dẫn chạy và 39 kiểm tra tích hợp](docs/docker-integration.md).
+Ứng dụng quản lý lớp giáo lý và điểm danh: web quản trị theo phương án **A**, mobile điểm danh theo phương án **C**. Giao diện tiếng Việt, Inter, nền sáng, màu đỏ đô, trắng và trắng be. Web gọi API thật; không dùng dữ liệu giả hardcode trong React.
+
+SQL Server và Redis Docker đã được kiểm thử thực tế. Script Start-WebBuild hiện phục vụ web tại http://127.0.0.1:5175 và trỏ API 5083; các lượt kiểm thử gần đây dùng web 5175 → API 5083. Cần chọn đúng cấu hình API khi khởi động. Xem [hướng dẫn chạy và 39 kiểm tra tích hợp](docs/docker-integration.md).
 
 APK cài thử qua Wi-Fi và thẻ quét mẫu: xem [cài Android và kiểm thử camera thực tế](docs/android-device-test.md).
 
@@ -57,7 +59,7 @@ npm start
 
 - Android Emulator mặc định gọi `http://10.0.2.2:5080/api/v1`.
 - Điện thoại thật: đặt `EXPO_PUBLIC_API_URL=http://<IP-LAN-máy-chủ>:5080/api/v1`, chạy API với `--urls http://0.0.0.0:5080` trong mạng thử nghiệm và cho phép cổng qua firewall khi cần. Không dùng `localhost` của máy tính trên điện thoại.
-- Môi trường phát hành phải dùng API HTTPS. Expo Go dùng cho thử nghiệm; cấu hình native cần quyền camera. Chưa có APK/IPA được ký hoặc bản phát hành lên cửa hàng.
+- Môi trường phát hành phải dùng API HTTPS. Expo Go dùng cho thử nghiệm; cấu hình native cần quyền camera. Đã có APK Android preview ký cục bộ; APK đó chưa chứa toàn bộ các cập nhật web/mobile về sau. Chưa có bản phát hành lên cửa hàng hoặc IPA được xác nhận.
 
 Đăng nhập, chọn buổi hôm nay, mở camera hoặc nhập mã thẻ. Mobile chỉ hiển thị thành công sau khi API commit. Mất mạng giữ request đang thử trong bộ nhớ để gửi lại cùng idempotency key; không có hàng đợi offline và không hứa đã lưu khi server chưa xác nhận.
 
@@ -155,5 +157,6 @@ Chi tiết kết quả và đối chiếu giao diện: [docs/verification.md](do
 - [Expo Camera](https://docs.expo.dev/versions/latest/sdk/camera/)
 
 Token màu/font của web nằm trong `apps/web/src/styles.css` và `production.css`; theme mobile nằm trong `apps/mobile/App.js`. Các lớp/học sinh được tạo trong Development là dữ liệu giả.
-#   C h e c k I n A p p  
+#   C h e c k I n A p p 
+ 
  

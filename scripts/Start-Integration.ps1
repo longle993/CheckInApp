@@ -1,10 +1,10 @@
-param([string]$LanAddress)
+param([string]$LanAddress, [int]$Port = 5083)
 . "$PSScriptRoot/Integration-Environment.ps1"
-$integrationUrls = 'http://127.0.0.1:5082'
+$integrationUrls = "http://127.0.0.1:$Port"
 if ($LanAddress) {
     $parsedLanAddress = $null
     if (![System.Net.IPAddress]::TryParse($LanAddress, [ref]$parsedLanAddress) -or $parsedLanAddress.AddressFamily -ne [System.Net.Sockets.AddressFamily]::InterNetwork) { throw 'LanAddress must be an IPv4 address of this computer.' }
-    $integrationUrls += ";http://${LanAddress}:5082"
+    $integrationUrls += ";http://${LanAddress}:$Port"
 }
 & docker @integrationCompose up -d --wait --wait-timeout 240 sqlserver redis
 if ($LASTEXITCODE -ne 0) { throw 'Docker integration services did not become healthy.' }

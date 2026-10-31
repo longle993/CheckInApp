@@ -35,7 +35,7 @@ import {
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import JsBarcode from "jsbarcode";
-import { api, can, setToken, clearToken, today, fmtDate, fmtTime } from "./api";
+import { displayPerson, api, can, setToken, clearToken, today, fmtDate, fmtTime } from "./api";
 import {
   Brand,
   Button,
@@ -52,6 +52,8 @@ import "./production.css";
 import { ExcelActions, PresencePanel } from "./extensions";
 
 const permissionLabels = {
+  WebSettingsView: "Xem thông tin web",
+  WebSettingsManage: "Sửa tên và logo web",
   ClassView: "Xem lớp học",
   ClassManage: "Quản lý lớp học",
   StudentView: "Xem học sinh",
@@ -82,15 +84,15 @@ const Context = createContext();
 const useApp = () => useContext(Context);
 const nav = [
   ["tongquan", "Tổng quan", LayoutDashboard, 10],
-  ["quet", "Điểm danh", ScanLine, 10],
+  ["quet", "Điểm danh thiếu nhi", ScanLine, 10],
+  ["quet-glv", "Điểm danh GLV", UserRoundCheck, 10],
   ["lop", "Lớp học", School, 0],
   ["hocsinh", "Học sinh", UsersRound, 2],
   ["lich", "Lịch", CalendarDays, 8],
   ["baocao", "Báo cáo", ChartNoAxesCombined, 13],
   ["glv", "Giáo lý viên", UserRoundCheck, 4],
   ["namhoc", "Năm học", CalendarRange, 6],
-  ["duyet", "Tài khoản", UserRoundCog, 14],
-  ["quyen", "Phân quyền", ShieldCheck, 16],
+  ["admin", "Admin Console", ShieldCheck, 14],
 ];
 function useData(path) {
   const { revision } = useApp();
@@ -139,7 +141,7 @@ const Status = ({ value }) => (
 );
 const nameCell = (r) => (
   <>
-    <strong className="long">{r.fullName || r.name}</strong>
+    <strong className="long">{displayPerson(r)}</strong>
     <small>{r.code || r.email}</small>
   </>
 );
@@ -440,10 +442,11 @@ function previewDays(v) {
   return result;
 }
 function Dashboard() {
-  const { go } = useApp();
+  const app=useApp();
+  const { go } = app;
   const [date, setDate] = useState(today());
   const data = useData(
-    "/attendance-sessions?" + query({ from: date, until: date }),
+    app.yearId ? "/attendance-sessions?" + query({ from: date, until: date,yearId:app.yearId,classId:app.classId }) : null,
   );
   const rows = (data.data?.items || []).filter((s) => !s.cancelled);
   let expected = rows.reduce((a, r) => a + r.expected, 0),
@@ -456,8 +459,8 @@ function Dashboard() {
       >
         <Button primary onClick={() => go("quet")}>
           <ScanLine />
-          Mở điểm danh
-        </Button>
+          Điểm danh thiếu nhi
+        </Button><Button onClick={()=>go("quet-glv")}><UserRoundCheck/>Điểm danh giáo lý viên</Button>
       </Head>
       <div className="filters">
         <DatePicker value={date} onChange={setDate} />
@@ -541,7 +544,8 @@ function Dashboard() {
     </>
   );
 }
-function Scan() {
+function Scan({teacher=false}) {
+  const app=useApp();
   const ask = useApp().ask;
   const { sessionChoice, user, toast, refresh } = useApp();
   const [date, setDate] = useState(today()),
@@ -557,15 +561,19 @@ function Scan() {
     video = useRef(null),
     pending = useRef(null);
   const sessions = useData(
-    "/attendance-sessions?" + query({ from: date, until: date }),
+    app.yearId ? "/attendance-sessions?" + query({ from: date, until: date,yearId:app.yearId,classId:app.classId }) : null,
   );
-  const all = sessions.data?.items || [];
+  const [rememberPrompt,setRememberPrompt]=useState(false);
+  const prefKey="ci-class-"+app.user.id+"-"+(teacher?"glv":"hs");
+  useEffect(()=>{try{const raw=document.cookie.split("; ").find(x=>x.startsWith(prefKey+"="));if(raw){const pref=JSON.parse(decodeURIComponent(raw.slice(prefKey.length+1)));if(pref.v===1&&pref.year===app.yearId&&app.classes.some(c=>c.id===pref.cls))app.setClassId(pref.cls);}}catch{}},[app.yearId,app.classes]);
+  const all = (sessions.data?.items || []).filter(s=>teacher?s.catechistAttendanceEnabled:s.studentAttendanceEnabled);
   useEffect(() => {
-    if (all.length && !all.some((s) => s.id === id)) setId(all[0].id);
+    if(!app.classId&&all.length){const preferred=all.filter(s=>s.status==="Open");const candidates=preferred.length?preferred:all.filter(s=>s.status==="Scheduled");const ids=[...new Set(candidates.map(s=>s.classRoomId))];if(ids.length===1)app.setClassId(ids[0]);else {setId("");return;}}
+    if (all.length && !all.some((s) => s.id === id)) setId(all.find(s=>s.status==="Open")?.id||all[0].id);
     if (!all.length) setId("");
   }, [sessions.data]);
   const session = all.find((s) => s.id === id);
-  const roster = useData(id ? `/attendance-sessions/${id}/roster` : null);
+  const roster = useData(!teacher&&id ? `/attendance-sessions/${id}/roster` : null);
   useEffect(() => () => controls.current?.stop(), []);
   useEffect(() => {
     setResult(null);
@@ -576,6 +584,7 @@ function Scan() {
     pending.current = null;
   }, [id]);
   async function submit(credential, method = "QR", retry = false) {
+    if (!retry && (teacher ? !credential.trim().startsWith("CG1-") : credential.trim().startsWith("CG1-"))){setError(teacher?"Vui lòng quét thẻ giáo lý viên.":"Vui lòng quét thẻ thiếu nhi.");return;}
     if (locked.current && !retry) return;
     locked.current = true;
     controls.current?.stop();
@@ -586,12 +595,13 @@ function Scan() {
     pending.current = retry
       ? pending.current
       : {
+          personType:teacher?"Catechist":"Student",
           credential: credential.trim(),
           clientRequestId: crypto.randomUUID(),
           method,
         };
     try {
-      const r = await api(`/attendance-sessions/${id}/check-ins`, {
+      const r = await api(`/attendance-sessions/${id}/${teacher?"catechists":"students"}/check-ins`, {
         method: "POST",
         body: pending.current,
       });
@@ -642,7 +652,8 @@ function Scan() {
         title={"Điểm danh" + (session ? " " + session.className : "")}
         subtitle={`${fmtDate(date)}${session ? " · " + fmtTime(session.opensAtUtc) + "–" + fmtTime(session.closesAtUtc) : ""}`}
       />
-      <div className="filters">
+      <div className="filters"><Select label="Lớp điểm danh" value={app.classId} options={[{value:"",label:"Chọn lớp"},...app.classes.map(c=>({value:c.id,label:c.name}))]} onChange={v=>{app.setClassId(v);setRememberPrompt(true);}}/>
+
         <DatePicker value={date} onChange={setDate} />
         <Select
           label="Chọn buổi"
@@ -655,6 +666,8 @@ function Scan() {
         />
         {session && <Status value={session.status} />}
       </div>
+      {rememberPrompt&&app.classId&&<div className="callout"><span>Lưu lớp đã chọn cho lần sau?</span><Button onClick={()=>{document.cookie=prefKey+"="+encodeURIComponent(JSON.stringify({v:1,year:app.yearId,cls:app.classId}))+"; Path=/; Max-Age=2592000; SameSite=Lax"+(location.protocol==="https:"?"; Secure":"");setRememberPrompt(false);}}>Lưu lựa chọn</Button><Button onClick={()=>setRememberPrompt(false)}>Chỉ dùng lần này</Button></div>}
+      <Button ghost onClick={()=>{document.cookie=prefKey+"=; Path=/; Max-Age=0; SameSite=Lax";toast("Đã xóa lớp đã nhớ.");}}>Xóa lựa chọn đã nhớ</Button>
       <State
         loading={sessions.loading}
         error={sessions.error}
@@ -670,7 +683,7 @@ function Scan() {
           <div className="split">
             <section className="card">
               <div className="between" style={{ marginBottom: 16 }}>
-                <h2>Quét thẻ {session.studentAttendanceEnabled && session.catechistAttendanceEnabled ? "HS / GLV" : session.catechistAttendanceEnabled ? "giáo lý viên" : "học sinh"}</h2>
+                <h2>Quét thẻ {teacher?"giáo lý viên":"thiếu nhi"}</h2>
                 <span className="small muted">QR / Code 128</span>
               </div>
               <div className="camera">
@@ -779,7 +792,7 @@ function Scan() {
                 điểm danh.
               </p>
             </section>
-            {session.studentAttendanceEnabled !== false && <section className="card flush">
+            {!teacher && <section className="card flush">
               <div className="compactstats">
                 <div>
                   <strong>{students.length - missing.length}</strong>
@@ -826,7 +839,7 @@ function Scan() {
                         <UserRoundCheck />
                       </span>
                       <div className="grow">
-                        <strong>{s.fullName}</strong>
+                        <strong>{displayPerson(s)}</strong>
                         <p>
                           {s.code} · {s.saintName || "Chưa có Tên Thánh"}
                         </p>
@@ -883,7 +896,7 @@ function Scan() {
         )}
       </State>
       {session && session.studentAttendanceEnabled === false && <p className="callout">Buổi này chỉ điểm danh giáo lý viên.</p>}
-      {session && <PresencePanel session={session} students={students} user={user} refresh={refresh} toast={toast} />}
+      {session && <PresencePanel teacherOnly={teacher} session={session} students={students} user={user} refresh={refresh} toast={toast} />}
     </>
   );
 }
@@ -1198,7 +1211,7 @@ function CredentialCard({ student, onClose }) {
     <Modal title={(teacher ? "Thẻ giáo lý viên" : "Thẻ học sinh") + " · 86 × 50 mm"} onClose={onClose}>
       <Select label="Định dạng thẻ" value={format} onChange={setFormat} options={[{value:"QR",label:"QR Code"},{value:"Barcode",label:"Barcode (Code 128)"}]} />
       <div id="print-card" className={"student-card " + (format === "QR" ? "qr" : "barcode")}>
-        <div className="card-information"><strong>CheckInApp · {teacher ? "THẺ GIÁO LÝ VIÊN" : "THẺ HỌC SINH"}</strong><h3>{student.fullName}</h3><p>Tên Thánh: {student.saintName || "—"}</p>{!teacher && <p>Ngày sinh: {fmtDate(student.dateOfBirth)}</p>}<p>Mã {teacher ? "GLV" : "HS"}: {student.code}</p><p>Lớp: {student.className || cls?.name || "—"}</p><p>Năm học: {student.academicYearName || year?.name || "—"}</p></div>
+        <div className="card-information"><strong>CheckInApp · {teacher ? "THẺ GIÁO LÝ VIÊN" : "THẺ HỌC SINH"}</strong><h3>{displayPerson(student)}</h3>{!teacher && <p>Ngày sinh: {fmtDate(student.dateOfBirth)}</p>}<p>Mã {teacher ? "GLV" : "HS"}: {student.code}</p><p>Lớp: {student.className || cls?.name || "—"}</p><p>Năm học: {student.academicYearName || year?.name || "—"}</p></div>
         <div className="card-symbol">{format === "QR" ? <QRCodeSVG value={student.credential} size={100} marginSize={4} level="M" /> : <svg ref={barcode} />}</div>
       </div>
       <p className="small muted">In tỷ lệ 100%, tắt header/footer; chọn Lưu PDF để xuất file thẻ.</p>
@@ -1232,7 +1245,7 @@ function Assignments({ data }) {
           <div className="listrow" key={a.id}>
             <div className="grow">
               <strong>
-                {data?.items.find((c) => c.id === a.catechistId)?.fullName}
+                {displayPerson(data?.items.find((c) => c.id === a.catechistId))}
               </strong>
               <p>
                 {classes.find((c) => c.id === a.classRoomId)?.name} · Từ{" "}
@@ -1264,7 +1277,7 @@ function Assignments({ data }) {
               type: "select",
               options: (data?.items || []).map((c) => ({
                 value: c.id,
-                label: c.fullName,
+                label: displayPerson(c),
               })),
             },
             { key: "from", label: "Từ ngày", type: "date" },
@@ -1277,14 +1290,15 @@ function Assignments({ data }) {
 }
 function SessionScheduleEditor({session,onClose}) {
   const app=useApp(),local=s=>new Date(new Date(s.endsWith("Z")?s:s+"Z").getTime()+7*3600000).toISOString().slice(11,16);
-  const [open,setOpen]=useState(local(session.opensAtUtc)),[close,setClose]=useState(local(session.closesAtUtc)),[hs,setHs]=useState(session.studentAttendanceEnabled),[glv,setGlv]=useState(session.catechistAttendanceEnabled),[reason,setReason]=useState(""),[error,setError]=useState(""),[busy,setBusy]=useState(false);
-  async function save(e){e.preventDefault();setBusy(true);setError("");try{await api(`/attendance-sessions/${session.id}/schedule`,{method:"PUT",body:{opensAt:open+":00",closesAt:close+":00",studentAttendanceEnabled:hs,catechistAttendanceEnabled:glv,reason,version:session.version}});app.refresh();app.toast("Đã cập nhật lịch buổi học.");onClose();}catch(e){setError(e.message);}finally{setBusy(false);}}
-  return <Modal title={"Chỉnh lịch · "+session.className+" · "+fmtDate(session.date)} onClose={()=>{if(!busy)onClose();}}><form onSubmit={save} className="stack"><p className="small muted">Giờ Việt Nam. Chỉ sửa trước khi buổi bắt đầu; giờ bắt đầu mới phải lớn hơn thời gian hiện tại.</p><label className="field">Giờ bắt đầu<input className="input" required type="time" value={open} onChange={e=>setOpen(e.target.value)}/></label><label className="field">Giờ kết thúc<input className="input" required type="time" value={close} onChange={e=>setClose(e.target.value)}/></label><label className="row"><input type="checkbox" className="check" checked={hs} onChange={e=>setHs(e.target.checked)}/>HS — Điểm danh học sinh</label><label className="row"><input type="checkbox" className="check" checked={glv} onChange={e=>setGlv(e.target.checked)}/>GLV — Điểm danh giáo lý viên</label><label className="field">Lý do điều chỉnh<input className="input" required maxLength={500} value={reason} onChange={e=>setReason(e.target.value)}/></label>{error&&<p className="form-error" role="alert">{error}</p>}<div className="modal-actions"><Button disabled={busy} onClick={onClose}>Hủy</Button><Button primary type="submit" disabled={busy}>Lưu lịch</Button></div></form></Modal>;
+  const [date,setDate]=useState(session.date),[open,setOpen]=useState(local(session.opensAtUtc)),[close,setClose]=useState(local(session.closesAtUtc)),[hs,setHs]=useState(session.studentAttendanceEnabled),[glv,setGlv]=useState(session.catechistAttendanceEnabled),[reason,setReason]=useState(""),[error,setError]=useState(""),[busy,setBusy]=useState(false);
+  async function save(e){e.preventDefault();setBusy(true);setError("");try{await api(`/attendance-sessions/${session.id}/schedule`,{method:"PUT",body:{date,opensAt:open+":00",closesAt:close+":00",studentAttendanceEnabled:hs,catechistAttendanceEnabled:glv,reason,version:session.version}});app.refresh();app.toast("Đã cập nhật lịch buổi học.");onClose(date);}catch(e){setError(e.message);}finally{setBusy(false);}}
+  return <Modal title={"Chỉnh lịch · "+session.className+" · "+fmtDate(session.date)} onClose={()=>{if(!busy)onClose();}}><form onSubmit={save} className="stack"><p className="small muted">Giờ Việt Nam. Ngày giờ bắt đầu mới phải lớn hơn hiện tại.</p><label className="field">Ngày học<input type="date" className="input" required value={date} onChange={e=>setDate(e.target.value)}/></label><label className="field">Giờ bắt đầu<input className="input" required type="time" value={open} onChange={e=>setOpen(e.target.value)}/></label><label className="field">Giờ kết thúc<input className="input" required type="time" value={close} onChange={e=>setClose(e.target.value)}/></label><label className="row"><input type="checkbox" className="check" checked={hs} onChange={e=>setHs(e.target.checked)}/>HS — Điểm danh học sinh</label><label className="row"><input type="checkbox" className="check" checked={glv} onChange={e=>setGlv(e.target.checked)}/>GLV — Điểm danh giáo lý viên</label><label className="field">Lý do điều chỉnh<input className="input" required maxLength={500} value={reason} onChange={e=>setReason(e.target.value)}/></label>{error&&<p className="form-error" role="alert">{error}</p>}<div className="modal-actions"><Button disabled={busy} onClick={onClose}>Hủy</Button><Button primary type="submit" disabled={busy}>Lưu lịch</Button></div></form></Modal>;
 }
 function Schedule() {
   const app = useApp(),
     [edit, setEdit] = useState(null),
     [sessionEdit,setSessionEdit]=useState(null),
+    [highlighted,setHighlighted]=useState(""),
     [exception, setException] = useState(false),
     [from, setFrom] = useState(today().slice(0, 8) + "01");
   const until = new Date(
@@ -1296,16 +1310,17 @@ function Schedule() {
     .toISOString()
     .slice(0, 10);
   const data = useData(
-      "/attendance-sessions?" + query({ from, until, classId: app.classId }),
+      "/attendance-sessions?" + query({ from, until, classId: app.classId,yearId:app.yearId }),
     ),
     schedules = useData(
-      "/catalog/schedules?" + query({ classId: app.classId }),
+      "/catalog/schedules?" + query({ classId: app.classId,yearId:app.yearId }),
     );
-  const cls = app.classes.find((c) => c.id === app.classId) || app.classes[0],
+  const cls = app.classes.find((c) => c.id === app.classId),
     year = app.years.find((y) => y.id === cls?.academicYearId);
   const activeSchedule = schedules.data?.items?.find(
     (s) => s.classRoomId === cls?.id,
   );
+  const exceptionSchedule=schedules.data?.items?.find(s=>s.id===exception)||activeSchedule;
   return (
     <>
       <Head
@@ -1314,6 +1329,7 @@ function Schedule() {
       >
         {can(app.user, 9) && (
           <>
+            <Button disabled={!cls} onClick={()=>setEdit({classRoomId:cls.id,from:today(),until:year?.endDate||today(),daysMask:1,opensAt:"09:00",closesAt:"10:00",studentAttendanceEnabled:true,catechistAttendanceEnabled:true})}>Thêm khung lịch</Button>
             <Button disabled={!cls} onClick={() => setException(true)}>
               Ngày nghỉ / bổ sung
             </Button>
@@ -1363,7 +1379,7 @@ function Schedule() {
       >
         <div className="card flush calendar-list">
           {data.data?.items.map((s) => (
-            <div className="calendar-row" key={s.id}>
+            <div className={"calendar-row "+(highlighted===s.id?"updated-session":"")} key={s.id}>
               <div className="datebox">
                 <small>{s.date.slice(5, 7)}</small>
                 <strong>{s.date.slice(8, 10)}</strong>
@@ -1381,11 +1397,13 @@ function Schedule() {
           ))}
         </div>
       </State>
-      {sessionEdit&&<SessionScheduleEditor session={sessionEdit} onClose={()=>setSessionEdit(null)}/>}
+      <div className="stack">{schedules.data?.items?.map(s=><div className="row wrap" key={s.id}><span>{app.classes.find(c=>c.id===s.classRoomId)?.name} · {s.opensAt}–{s.closesAt}</span><Button onClick={()=>setEdit({...s,opensAt:s.opensAt.slice(0,5),closesAt:s.closesAt.slice(0,5)})}>Sửa khung lịch</Button><Button onClick={()=>setException(s.id)}>Nghỉ / bổ sung khung này</Button></div>)}</div>
+      {sessionEdit&&<SessionScheduleEditor session={sessionEdit} onClose={date=>{if(typeof date==="string"){setFrom(date.slice(0,8)+"01");setHighlighted(sessionEdit.id);}setSessionEdit(null);}}/>}
       {edit && (
         <Editor
           title="Cấu hình lịch điểm danh"
           kind="schedules"
+          id={edit.id}
           initial={edit}
           fields={[
             { key: "studentAttendanceEnabled", label: "HS — Điểm danh học sinh", type: "boolean" },
@@ -1404,7 +1422,8 @@ function Schedule() {
           title="Ngày nghỉ hoặc buổi bổ sung"
           kind="exceptions"
           initial={{
-            classRoomId: cls?.id,
+            classRoomId: exceptionSchedule?.classRoomId,
+            scheduleId: exceptionSchedule?.id,
             date: today(),
             cancelled: true,
             studentAttendanceEnabled: activeSchedule?.studentAttendanceEnabled ?? true,
@@ -1412,6 +1431,7 @@ function Schedule() {
             reason: "",
           }}
           fields={[
+            {key:"scheduleId",label:"Khung lịch áp dụng",type:"select",options:(schedules.data?.items||[]).filter(s=>s.classRoomId===exceptionSchedule?.classRoomId).map(s=>({value:s.id,label:s.opensAt+"–"+s.closesAt}))},
             { key: "date", label: "Ngày", type: "date" },
             {
               key: "cancelled",
@@ -1486,14 +1506,14 @@ function Report() {
           : r?.students || [];
   function csv() {
     let output = [
-      ["Tên", "Mã", "Có mặt", "Vắng", "Buổi hợp lệ", "Tỷ lệ"],
+      ["Tên Thánh và họ tên", "Mã", "Có mặt (buổi)", "Vắng (buổi)", "Buổi hợp lệ", "Tỷ lệ", "Ngày đủ", "Ngày chưa đủ", "Ngày một phần"],
       ...rows.map((x) => [
-        x.fullName || x.name,
+        displayPerson(x),
         x.code,
         x.present,
         x.absent,
         x.expected,
-        rate(x.rate),
+        rate(x.rate),x.presentDays,x.absentDays,x.partialDays,
       ]),
     ]
       .map((row) =>
@@ -1625,8 +1645,9 @@ function Report() {
             ...(tab === "all"
               ? []
               : [{ label: "Tên Thánh", key: "saintName" }]),
-            { label: "Có mặt", key: "present" },
-            { label: "Vắng", key: "absent" },
+            { label: "Có mặt (buổi)", key: "present" },
+            { label: "Vắng (buổi)", key: "absent" },
+            ...(tab!=="all"?[{label:"Ngày đủ",key:"presentDays"},{label:"Ngày chưa đủ",key:"absentDays"}]:[]),
             { label: "Buổi hợp lệ", key: "expected" },
             { label: "Tỷ lệ", render: (r) => rate(r.rate) },
           ]}
@@ -1638,7 +1659,7 @@ function Report() {
             {rows.map((s) => (
               <details className="report-person" key={s.studentId}>
                 <summary>
-                  <strong>{s.fullName}</strong>
+                  <strong>{displayPerson(s)}</strong>
                   <span className="muted small">
                     {s.present}/{s.expected} có mặt · {s.absent} vắng
                   </span>
@@ -1697,7 +1718,7 @@ function Users() {
   }
   return (
     <>
-      <Head
+      <Head level={2}
         title="Tài khoản"
         subtitle="Tài khoản chờ duyệt chưa được sử dụng nghiệp vụ."
       >
@@ -1823,7 +1844,7 @@ function Users() {
                   { value: "", label: "Không liên kết" },
                   ...(catechists.data?.items || [])
                     .filter((c) => !c.userId)
-                    .map((c) => ({ value: c.id, label: c.fullName })),
+                    .map((c) => ({ value: c.id, label: displayPerson(c) })),
                 ]}
               />
             </div>
@@ -1883,7 +1904,7 @@ function Roles() {
   }
   return (
     <>
-      <Head
+      <Head level={2}
         title="Phân quyền chức năng"
         subtitle="Quyền chức năng và phạm vi lớp đều được kiểm tra tại API."
       >
@@ -2001,6 +2022,15 @@ function Question({ question, onAnswer }) {
     </Modal>
   );
 }
+function AdminConsole({initial}) {
+ const {user}=useApp();const tabs=[can(user,14)&&["users","Tài khoản"],can(user,16)&&["roles","Vai trò & phân quyền"],(can(user,28)||can(user,29))&&["settings","Thông tin web"]].filter(Boolean);const [tab,setTab]=useState(initial||tabs[0]?.[0]);
+ return <><Head title="Admin Console"/><nav className="row wrap" aria-label="Admin Console">{tabs.map(([id,label])=><Button key={id} primary={id===tab} aria-current={id===tab?"page":undefined} onClick={()=>setTab(id)}>{label}</Button>)}</nav>{tab==="users"?<Users/>:tab==="roles"?<Roles/>:<WebSettingsEditor/>}</>;
+}
+function WebSettingsEditor(){const app=useApp(),[state,setState]=useState(null),[name,setName]=useState(""),[logo,setLogo]=useState(null),[remove,setRemove]=useState(false),[error,setError]=useState(""),[busy,setBusy]=useState(false);async function load(){try{const s=await api("/web-settings/admin");setState(s);setName(s.name);setLogo(null);setRemove(false);}catch(e){setError(e.message);}}useEffect(()=>{load();},[]);
+ async function file(f){if(!f)return;try{if(!["image/png","image/jpeg","image/webp"].includes(f.type)||f.size>2000000)throw new Error("Chọn PNG/JPEG/WebP tối đa 2 MB.");const bitmap=await createImageBitmap(f);if(bitmap.width>2048||bitmap.height>2048){bitmap.close();throw new Error("Logo tối đa 2048×2048 pixel.");}const canvas=document.createElement("canvas");canvas.width=bitmap.width;canvas.height=bitmap.height;canvas.getContext("2d").drawImage(bitmap,0,0);bitmap.close();setLogo(canvas.toDataURL("image/png"));setRemove(false);setError("");}catch(e){setError(e.message);}}
+ async function save(e){e.preventDefault();setBusy(true);setError("");try{const s=await api("/web-settings",{method:"PUT",body:{name,version:state.version,logoBase64:logo?.split(",")[1]||null,removeLogo:remove}});setState(s);setLogo(null);setRemove(false);window.dispatchEvent(new Event("branding-updated"));app.toast("Đã lưu thông tin web.");}catch(e){setError(e.message);}finally{setBusy(false);}}
+ return <section className="card" style={{marginTop:20}}><h2>Thông tin web</h2>{error&&<p className="form-error" role="alert">{error}</p>}{state&&<form onSubmit={save} className="stack"><label className="field">Tên web<input className="input" required maxLength={100} value={name} disabled={!can(app.user,29)} onChange={e=>setName(e.target.value)}/></label><label className="field">Logo<input type="file" accept="image/png,image/jpeg,image/webp" disabled={!can(app.user,29)} onChange={e=>file(e.target.files[0])}/></label><div className="row">{!remove&&(logo||state.logoUrl)&&<img src={logo||state.logoUrl} alt="Logo xem trước" style={{width:64,height:64,objectFit:"contain"}}/>}<strong>{name}</strong></div>{can(app.user,29)&&<><Button onClick={()=>{setRemove(true);setLogo(null);}}>Xóa logo tùy chỉnh</Button><div className="modal-actions"><Button disabled={busy} onClick={load}>Hủy thay đổi</Button><Button primary type="submit" disabled={busy}>Lưu thông tin web</Button></div></>}</form>}</section>;
+}
 function PasswordEditor({onClose,onChanged}) {
   const [currentPassword,setCurrent]=useState(""),[newPassword,setNew]=useState(""),[confirmPassword,setConfirm]=useState(""),[busy,setBusy]=useState(false),[error,setError]=useState("");
   async function submit(e){e.preventDefault();setError("");if(newPassword!==confirmPassword){setError("Xác nhận mật khẩu mới không khớp.");return;}setBusy(true);try{await api("/auth/change-password",{method:"POST",body:{currentPassword,newPassword,confirmPassword}});onChanged();}catch(e){setError(e.message);}finally{setBusy(false);}}
@@ -2054,18 +2084,16 @@ function App() {
         .then((d) => {
           if (live) {
             setYears(d.items);
-            setYearId(
-              (v) =>
-                v ||
-                d.items.find((y) => y.isActive)?.id ||
-                d.items[0]?.id ||
-                "",
-            );
+            setYearId(v=>{
+              if(v&&d.items.some(y=>y.id===v))return v;
+              for(const kind of route==="quet-glv"?["glv","hs"]:["hs","glv"]){try{const key="ci-class-"+user.id+"-"+kind;const raw=document.cookie.split("; ").find(x=>x.startsWith(key+"="));if(raw){const pref=JSON.parse(decodeURIComponent(raw.slice(key.length+1)));if(pref.v===1&&d.items.some(y=>y.id===pref.year&&y.startDate<=today()&&y.endDate>=today()))return pref.year;}}catch{}}
+              return d.items.find(y=>y.isActive&&y.startDate<=today()&&y.endDate>=today())?.id||[...d.items].filter(y=>y.startDate<=today()&&y.endDate>=today()).sort((a,b)=>b.startDate.localeCompare(a.startDate))[0]?.id||"";
+            });
           }
         })
         .catch(() => {});
-    if (can(user, 0))
-      api("/catalog/classes?pageSize=100" + (yearId ? "&yearId=" + yearId : ""))
+    if (can(user, 0)&&yearId)
+      api("/catalog/classes?pageSize=1000" + (yearId ? "&yearId=" + yearId : ""))
         .then((d) => live && setClasses(d.items))
         .catch(() => {});
     return () => (live = false);
@@ -2089,6 +2117,7 @@ function App() {
       setUser(null);
       setClasses([]);
       setYears([]);
+      setYearId("");setClassId("");setSessionChoice("");
     }
   }
   const value = {
@@ -2118,7 +2147,7 @@ function App() {
         }}
       />
     );
-  let visibleNav = nav.filter((n) => can(user, n[3]));
+  let visibleNav = nav.filter((n) => n[0]==="admin" ? [14,16,28,29].some(bit=>can(user,bit)) : can(user,n[3]));
   const side = (
     <>
       <Brand />
@@ -2145,17 +2174,17 @@ function App() {
             {user.globalScope ? "Toàn đơn vị" : "Lớp được phân công"}
           </p>
         </div>
-        <Button ghost className="icon" aria-label="Đổi mật khẩu" title="Đổi mật khẩu" onClick={()=>setPasswordOpen(true)}><KeyRound /></Button>
+        <div className="profile-actions"><Button ghost className="icon" aria-label="Đổi mật khẩu" title="Đổi mật khẩu" onClick={()=>setPasswordOpen(true)}><KeyRound /></Button>
         <Button ghost className="icon" aria-label="Đăng xuất" onClick={logout}>
           <LogOut />
-        </Button>
+        </Button></div>
       </div>
     </>
   );
-  let allowed = visibleNav.some((n) => n[0] === route);
+  let allowed = route==="khac" || visibleNav.some((n) => n[0] === route) || (route==="duyet"&&can(user,14)) || (route==="quyen"&&can(user,16));
   return (
     <Context.Provider value={value}>
-      {passwordOpen&&<PasswordEditor onClose={()=>setPasswordOpen(false)} onChanged={()=>{setPasswordOpen(false);clearToken();setUser(null);setClasses([]);setYears([]);setPasswordNotice("Đổi mật khẩu thành công. Vui lòng đăng nhập lại bằng mật khẩu mới.");}}/>}
+      {passwordOpen&&<PasswordEditor onClose={()=>setPasswordOpen(false)} onChanged={()=>{setPasswordOpen(false);clearToken();setUser(null);setClasses([]);setYears([]);setYearId("");setClassId("");setSessionChoice("");setPasswordNotice("Đổi mật khẩu thành công. Vui lòng đăng nhập lại bằng mật khẩu mới.");}}/>}
       <div className="app live-app">
         <aside className="sidebar">{side}</aside>
         <main className="main">
@@ -2186,34 +2215,23 @@ function App() {
               <div className="empty muted">
                 Bạn chưa có quyền truy cập màn này.
               </div>
-            ) : route === "tongquan" ? (
+            ) : route === "khac" ? (<><Head title="Chức năng khác"/><div className="stack">{visibleNav.filter(n=>!["tongquan","quet","quet-glv","lich"].includes(n[0])).map(([key,label,Icon])=><Button key={key} onClick={()=>go(key)}><Icon/>{label}</Button>)}<Button onClick={()=>setPasswordOpen(true)}>Đổi mật khẩu</Button><Button onClick={logout}>Đăng xuất</Button></div></>) : route === "tongquan" ? (
               <Dashboard />
-            ) : route === "quet" ? (
-              <Scan />
+            ) : ["quet","quet-glv"].includes(route) ? (
+              <Scan key={route} teacher={route==="quet-glv"}/>
             ) : ["lop", "hocsinh", "glv", "namhoc"].includes(route) ? (
               <CatalogPage key={route} type={route} />
             ) : route === "lich" ? (
               <Schedule />
             ) : route === "baocao" ? (
               <Report />
-            ) : route === "duyet" ? (
-              <Users />
             ) : (
-              <Roles />
+              <AdminConsole key={route} initial={route==="duyet"?"users":route==="quyen"?"roles":null} />
             )}
           </div>
         </main>
       </div>
-      {menu && (
-        <div
-          className="mobile-overlay open"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setMenu(false);
-          }}
-        >
-          <aside className="sidebar">{side}</aside>
-        </div>
-      )}
+      <nav className="bottom-nav" aria-label="Điều hướng chính">{[["tongquan","Tổng quan",LayoutDashboard],["quet","Thiếu nhi",ScanLine],["quet-glv","GLV",UserRoundCheck],["lich","Lịch",CalendarDays],["khac","Khác",Menu]].filter(([key])=>key==="khac"||visibleNav.some(n=>n[0]===key)).map(([key,label,Icon])=><a key={key} href={"#"+key} aria-current={route===key?"page":undefined}><Icon size={20}/><span>{label}</span></a>)}</nav>
       {question && (
         <Question
           question={question}

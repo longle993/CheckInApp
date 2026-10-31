@@ -10,6 +10,7 @@ public class AttendanceService(AppDbContext db, AccessService access, TimeProvid
     public async Task<CheckInResult> CheckIn(CheckInCommand c, CancellationToken ct)
     {
         await access.Require(c.ActorId, Permission.CheckIn, ct);
+        if(c.Input.PersonType!=null && (c.Input.PersonType is not ("Student" or "Catechist") || (c.Input.PersonType=="Catechist")!=c.Input.Credential.Trim().StartsWith("CG1-",StringComparison.Ordinal)))throw new AppException(400,"WRONG_CARD_TYPE","Loại thẻ không đúng màn điểm danh.");
         if (c.Input.Credential.Trim().StartsWith("CG1-", StringComparison.Ordinal))
             await access.Require(c.ActorId, Permission.CatechistAttendance, ct);
         if (c.Input.Credential.Length is < 8 or > 256 || c.Input.ClientRequestId.Length is < 8 or > 100)
@@ -73,7 +74,7 @@ public class AttendanceService(AppDbContext db, AccessService access, TimeProvid
                 db.CatechistAttendance.Add(attendance);
             }
             session.Version=Guid.NewGuid();
-            var response=new CheckInResult(repeated?"AlreadyCheckedIn":"Created",attendance.Id,teacher.Id,teacher.FullName,"GLV-"+teacher.Id.ToString("N")[..8].ToUpperInvariant(),true,attendance.CheckedInAtUtc,attendance.Version,"Catechist");
+            var response=new CheckInResult(repeated?"AlreadyCheckedIn":"Created",attendance.Id,teacher.Id,((teacher.SaintName??"")+" "+teacher.FullName).Trim(),"GLV-"+teacher.Id.ToString("N")[..8].ToUpperInvariant(),true,attendance.CheckedInAtUtc,attendance.Version,"Catechist");
             db.Idempotency.Add(new() {ActorId=c.ActorId,Key=c.Input.ClientRequestId,PayloadHash=payloadHash,AttendanceRecordId=attendance.Id,ResponseJson=JsonSerializer.Serialize(response)});
             if(!repeated) db.Audit.Add(new() {ActorId=c.ActorId,Action="CheckIn",EntityType="CatechistAttendance",EntityId=attendance.Id,Detail=c.Input.Method});
             await db.SaveChangesAsync(ct);await tx.CommitAsync(ct);return response;
@@ -100,7 +101,7 @@ public class AttendanceService(AppDbContext db, AccessService access, TimeProvid
         }
         // Updating the session's concurrency token serializes check-in against schedule/session changes.
         session.Version = Guid.NewGuid();
-        var result = new CheckInResult(duplicate ? "AlreadyCheckedIn" : "Created", record.Id, student.Id, student.FullName, student.Code, record.Present, record.RecordedAtUtc, record.Version);
+        var result = new CheckInResult(duplicate ? "AlreadyCheckedIn" : "Created", record.Id, student.Id, ((student.SaintName??"")+" "+student.FullName).Trim(), student.Code, record.Present, record.RecordedAtUtc, record.Version);
         db.Idempotency.Add(new()
         {
             ActorId = c.ActorId,
@@ -141,6 +142,7 @@ public class AttendanceService(AppDbContext db, AccessService access, TimeProvid
         if (cached != null)
             return cached.Value;
         var sessions = await db.Sessions.AsNoTracking().Where(x => ids.Contains(x.ClassRoomId) && x.Date >= q.From && x.Date <= q.Until && !x.Cancelled && x.StudentAttendanceEnabled && x.ClosesAtUtc <= now).ToListAsync(ct);
+        var pendingDays=await db.Sessions.Where(x=>ids.Contains(x.ClassRoomId)&&x.Date>=q.From&&x.Date<=q.Until&&!x.Cancelled&&x.StudentAttendanceEnabled&&x.ClosesAtUtc>now).Select(x=>new {x.ClassRoomId,x.Date}).ToListAsync(ct);
         var sessionIds = sessions.Select(x => x.Id).ToList();
         var roster = await db.Rosters.AsNoTracking().Where(x => sessionIds.Contains(x.SessionId)).ToListAsync(ct);
         var records = await db.Attendance.AsNoTracking().Where(x => sessionIds.Contains(x.SessionId) && x.Present).ToListAsync(ct);
@@ -157,6 +159,7 @@ public class AttendanceService(AppDbContext db, AccessService access, TimeProvid
             var eligible = roster.Where(r => r.StudentId == id && sessions.Any(s => s.Id == r.SessionId && s.ClassRoomId == cls.Id)).ToList();
             var p = eligible.Count(r => present.Contains((r.SessionId, r.StudentId)));
             var st = students[id];
+            var daily=eligible.GroupBy(r=>sessions.Single(s=>s.Id==r.SessionId).Date).Select(g=>new {date=g.Key,finalized=!pendingDays.Any(x=>x.ClassRoomId==cls.Id&&x.Date==g.Key),present=g.All(r=>present.Contains((r.SessionId,r.StudentId))),partial=g.Any(r=>present.Contains((r.SessionId,r.StudentId)))&&!g.All(r=>present.Contains((r.SessionId,r.StudentId))),sessions=g.Select(r=>new {r.SessionId,opensAtUtc=sessions.Single(s=>s.Id==r.SessionId).OpensAtUtc,closesAtUtc=sessions.Single(s=>s.Id==r.SessionId).ClosesAtUtc,present=present.Contains((r.SessionId,r.StudentId))})}).OrderBy(x=>x.date).ToList();
             rows.Add(new
             {
                 studentId = id,
@@ -170,7 +173,8 @@ public class AttendanceService(AppDbContext db, AccessService access, TimeProvid
                 present = p,
                 absent = eligible.Count - p,
                 rate = AttendanceRules.Rate(p, eligible.Count),
-                days = eligible.Select(r => new { date = sessions.Single(s => s.Id == r.SessionId).Date, present = present.Contains((r.SessionId, r.StudentId)) }).OrderBy(x => x.date)
+                expectedDays=daily.Count(x=>x.finalized),presentDays=daily.Count(x=>x.finalized&&x.present),absentDays=daily.Count(x=>x.finalized&&!x.present),partialDays=daily.Count(x=>x.finalized&&x.partial),
+                days = daily
             });
         }
         var summary = classes.Select(cls => { var ss = sessions.Where(s => s.ClassRoomId == cls.Id).Select(s => s.Id).ToHashSet(); var rr = roster.Where(r => ss.Contains(r.SessionId)).ToList(); var p = rr.Count(r => present.Contains((r.SessionId, r.StudentId))); return new { classId = cls.Id, cls.Name, cls.Code, sessions = ss.Count, expected = rr.Count, present = p, absent = rr.Count - p, rate = AttendanceRules.Rate(p, rr.Count) }; }).ToList();

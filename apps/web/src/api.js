@@ -79,3 +79,5 @@ export const fmtTime = (s) =>
     : "—";
 export const can = (user, bit) =>
   !!user && (BigInt(user.permissions) & (1n << BigInt(bit))) !== 0n;
+
+export const displayPerson = p => p ? [p.saintName,p.fullName||p.name].filter(Boolean).join(" ").replace(/\s+/g," ").trim() : "";

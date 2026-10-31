@@ -10,7 +10,7 @@ public sealed class AppException(int status, string code, string message) : Exce
 public record Actor(Guid Id);
 public record LoginInput(string Email, string Password, string? Client);
 public record RegisterInput(string Email, string Password, string FullName);
-public record CheckInInput(string Credential, string ClientRequestId, string Method = "QR");
+public record CheckInInput(string Credential, string ClientRequestId, string Method = "QR", string? PersonType=null);
 public record CheckInResult(string ResultCode, Guid AttendanceRecordId, Guid StudentId, string StudentName, string StudentCode, bool Present, DateTime RecordedAtUtc, Guid Version, string PersonType = "Student");
 public record CheckInCommand(Guid ActorId, Guid SessionId, CheckInInput Input) : IRequest<CheckInResult>;
 public record ReportQuery(Guid ActorId, Guid? ClassId, DateOnly From, DateOnly Until, Guid? YearId = null) : IRequest<object>;

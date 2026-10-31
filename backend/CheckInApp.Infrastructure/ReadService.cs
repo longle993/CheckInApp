@@ -13,6 +13,7 @@ public class ReadService(AppDbContext db, AccessService access, TimeProvider clo
             await access.Class(actor, classId.Value, ct);
             ids = [classId.Value];
         }
+        if(yearId!=null)ids=await db.Classes.Where(x=>ids.Contains(x.Id)&&x.AcademicYearId==yearId).Select(x=>x.Id).ToListAsync(ct);
         page = Math.Max(1, page);
         pageSize = Math.Clamp(pageSize, 1, 1000);
         var skip = (page - 1) * pageSize;
@@ -91,7 +92,7 @@ public class ReadService(AppDbContext db, AccessService access, TimeProvider clo
                 throw new AppException(404, "NOT_FOUND", "Không có danh mục này.");
         }
     }
-    public async Task<object> Sessions(Guid actor, DateOnly from, DateOnly until, Guid? classId, CancellationToken ct)
+    public async Task<object> Sessions(Guid actor, DateOnly from, DateOnly until, Guid? classId, CancellationToken ct, Guid? yearId=null)
     {
         await access.Require(actor, Permission.AttendanceView, ct);
         if (until < from || until.DayNumber - from.DayNumber > 400)
@@ -102,11 +103,12 @@ public class ReadService(AppDbContext db, AccessService access, TimeProvider clo
             await access.Class(actor, classId.Value, ct);
             ids = [classId.Value];
         }
+        if(yearId!=null)ids=await db.Classes.Where(x=>ids.Contains(x.Id)&&x.AcademicYearId==yearId).Select(x=>x.Id).ToListAsync(ct);
         var now = clock.GetUtcNow().UtcDateTime;
-        var rows = await (from s in db.Sessions.AsNoTracking() join c in db.Classes on s.ClassRoomId equals c.Id where ids.Contains(c.Id) && s.Date >= @from && s.Date <= until orderby s.Date, s.OpensAtUtc select new { s.Id, s.ClassRoomId, className = c.Name, classCode = c.Code, teacherName = db.Catechists.Where(g => db.Assignments.Any(a => a.CatechistId == g.Id && a.ClassRoomId == c.Id && a.From <= s.Date && (a.Until == null || s.Date < a.Until))).OrderBy(g => g.FullName).Select(g => g.FullName).FirstOrDefault(), s.Date, s.OpensAtUtc, s.ClosesAtUtc, s.StudentAttendanceEnabled, s.CatechistAttendanceEnabled, s.Cancelled, s.Version, expected = db.Rosters.Count(x => x.SessionId == s.Id), present = db.Attendance.Count(x => x.SessionId == s.Id && x.Present) }).ToListAsync(ct);
+        var rows = await (from s in db.Sessions.AsNoTracking() join c in db.Classes on s.ClassRoomId equals c.Id where ids.Contains(c.Id) && s.Date >= @from && s.Date <= until orderby s.Date, s.OpensAtUtc select new { s.Id, s.ClassRoomId, className = c.Name, classCode = c.Code, s.ScheduleId, teacherName = db.Catechists.Where(g => db.Assignments.Any(a => a.CatechistId == g.Id && a.ClassRoomId == c.Id && a.From <= s.Date && (a.Until == null || s.Date < a.Until))).OrderBy(g => g.FullName).Select(g => ((g.SaintName??"")+" "+g.FullName).Trim()).FirstOrDefault(), s.Date, s.OpensAtUtc, s.ClosesAtUtc, s.StudentAttendanceEnabled, s.CatechistAttendanceEnabled, s.Cancelled, s.Version, expected = db.Rosters.Count(x => x.SessionId == s.Id), present = db.Attendance.Count(x => x.SessionId == s.Id && x.Present) }).ToListAsync(ct);
         return new
         {
-            items = rows.Select(s => new { s.Id, s.ClassRoomId, s.className, s.classCode, s.teacherName, s.Date, s.OpensAtUtc, s.ClosesAtUtc, s.StudentAttendanceEnabled, s.CatechistAttendanceEnabled, s.Cancelled, s.Version, s.expected, s.present, missing = s.expected - s.present, status = s.Cancelled ? "Cancelled" : now < s.OpensAtUtc ? "Scheduled" : now >= s.ClosesAtUtc ? "Closed" : "Open" })
+            items = rows.Select(s => new { s.Id, s.ScheduleId, s.ClassRoomId, s.className, s.classCode, s.teacherName, s.Date, s.OpensAtUtc, s.ClosesAtUtc, s.StudentAttendanceEnabled, s.CatechistAttendanceEnabled, s.Cancelled, s.Version, s.expected, s.present, missing = s.expected - s.present, status = s.Cancelled ? "Cancelled" : now < s.OpensAtUtc ? "Scheduled" : now >= s.ClosesAtUtc ? "Closed" : "Open" })
         };
     }
     public async Task<object> Roster(Guid actor, Guid id, CancellationToken ct)

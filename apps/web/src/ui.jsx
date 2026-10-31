@@ -10,9 +10,12 @@ import {
 import { fmtDate } from "./api";
 import { createPortal } from "react-dom";
 export function Brand() {
+  const [branding,setBranding]=useState({name:"CheckInApp",logoUrl:null});
+  useEffect(()=>{let live=true;async function load(){try{const r=await fetch("/api/v1/web-settings");if(r.ok){const s=await r.json();if(live){setBranding(s);document.title=s.name;}}}catch{}}load();window.addEventListener("branding-updated",load);return()=>{live=false;window.removeEventListener("branding-updated",load);};},[]);
+
   return (
     <a href="#tongquan" className="brand">
-      <span className="mark">
+      {branding.logoUrl ? <img src={branding.logoUrl} alt="" onError={()=>setBranding(s=>({...s,logoUrl:null}))} style={{width:32,height:32,objectFit:"contain"}}/> : <span className="mark">
         <svg
           viewBox="0 0 24 24"
           fill="none"
@@ -24,8 +27,8 @@ export function Brand() {
           <rect x="4" y="4" width="7" height="7" rx="1" />
           <path d="M15 4h5v5M4 15v5h5m6-3 2 2 4-5" />
         </svg>
-      </span>
-      CheckInApp
+      </span>}
+      {branding.name}
     </a>
   );
 }
@@ -49,11 +52,12 @@ export function Button({
 export function Badge({ children, kind = "neutral" }) {
   return <span className={"badge " + kind}>{children}</span>;
 }
-export function Head({ title, subtitle, children }) {
+export function Head({ title, subtitle, children, level=1 }) {
+  const Title=level===2?"h2":"h1";
   return (
     <div className="pagehead">
       <div>
-        <h1>{title}</h1>
+        <Title>{title}</Title>
         {subtitle && <p>{subtitle}</p>}
       </div>
       {children && <div className="head-actions">{children}</div>}

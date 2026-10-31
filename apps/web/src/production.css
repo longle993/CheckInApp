@@ -344,3 +344,11 @@ html {
 @media(max-width:767px) { .filters .excel-actions { margin-left:0; width:100%; } .excel-actions .btn { flex:1 1 auto; } }
 @media(max-width:767px) { .calendar-row > .row { grid-column:2; justify-self:start; } }
 
+
+:root { --primary:#781f36; --primary-hover:#60182b; --primary-light:#f8edf0; --border-focus:#781f36; --ring-focus:#781f3633; --background:#faf7f2; --surface:#ffffff; --secondary:#f4e9e9; }
+.bottom-nav {display:none;}
+@media(max-width:767px){.mobile-menu{display:none!important}.bottom-nav{display:flex;position:fixed;bottom:0;left:0;right:0;padding:8px 4px calc(8px + env(safe-area-inset-bottom));background:var(--surface);border-top:1px solid var(--border);z-index:80;justify-content:space-around}.bottom-nav a{display:flex;flex-direction:column;align-items:center;gap:4px;font-size:11px;color:var(--muted-foreground)}.bottom-nav a[aria-current=page]{color:var(--primary);font-weight:600}.content{padding-bottom:calc(100px + env(safe-area-inset-bottom))!important}}
+
+.profile {display:grid;grid-template-columns:32px minmax(0,1fr);}.profile-actions {grid-column:2;display:flex;gap:8px;}.profile-actions .btn {margin-left:0;}
+
+.updated-session {background:var(--primary-light);border-left:3px solid var(--primary);}

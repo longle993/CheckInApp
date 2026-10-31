@@ -58,14 +58,14 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         m.Entity<AcademicYear>().HasIndex(x => x.Name).IsUnique();
         m.Entity<ClassRoom>().HasIndex(x => new { x.AcademicYearId, x.Code }).IsUnique();
         m.Entity<Student>().HasIndex(x => x.Code).IsUnique();
-        m.Entity<AttendanceSession>().HasIndex(x => new { x.ClassRoomId, x.Date }).IsUnique();
+        m.Entity<AttendanceSession>().HasIndex(x => new { x.ClassRoomId, x.Date, x.OpensAtUtc }).IsUnique();
         m.Entity<SessionRoster>().HasIndex(x => new { x.SessionId, x.StudentId }).IsUnique();
         m.Entity<AttendanceRecord>().HasIndex(x => new { x.SessionId, x.StudentId }).IsUnique();
         m.Entity<IdempotencyRequest>().HasIndex(x => new { x.ActorId, x.Key }).IsUnique();
         m.Entity<StudentCredential>().HasIndex(x => x.TokenHash).IsUnique();
         m.Entity<RefreshToken>().HasIndex(x => x.Hash).IsUnique();
-        m.Entity<ScheduleException>().HasIndex(x => new { x.ClassRoomId, x.Date }).IsUnique();
-        m.Entity<AttendanceSchedule>().HasIndex(x => x.ClassRoomId).IsUnique();
+        m.Entity<ScheduleException>().HasIndex(x => new { x.ClassRoomId, x.ScheduleId, x.Date }).IsUnique();
+        m.Entity<AttendanceSchedule>().HasIndex(x => x.ClassRoomId);
         m.Entity<Catechist>().HasIndex(x => x.UserId).IsUnique().HasFilter("[UserId] IS NOT NULL");
         m.Entity<AttendanceRecord>().Property(x => x.Version).IsConcurrencyToken();
         m.Entity<AttendanceSession>().Property(x => x.Version).IsConcurrencyToken();

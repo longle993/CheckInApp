@@ -90,9 +90,11 @@ public class DataController(ReadService read, AdminService admin, ISender sender
     [HttpGet("catalog/{kind}")] public Task<object> List(string kind, string? q, Guid? classId, Guid? yearId, int page = 1, int pageSize = 50, CancellationToken ct = default) => read.List(Actor, kind, q, classId, yearId, page, pageSize, ct);
     [HttpPost("catalog/{kind}")] public Task<object> Create(string kind, JsonElement data, CancellationToken ct) => sender.Send(new CatalogCommand(Actor, kind, null, data), ct);
     [HttpPut("catalog/{kind}/{id:guid}")] public Task<object> Update(string kind, Guid id, JsonElement data, CancellationToken ct) => sender.Send(new CatalogCommand(Actor, kind, id, data), ct);
-    [HttpGet("attendance-sessions"), AspNetRole(Permission.AttendanceView)] public Task<object> Sessions(DateOnly from, DateOnly until, Guid? classId, CancellationToken ct) => read.Sessions(Actor, from, until, classId, ct);
+    [HttpGet("attendance-sessions"), AspNetRole(Permission.AttendanceView)] public Task<object> Sessions(DateOnly from, DateOnly until, Guid? classId, Guid? yearId, CancellationToken ct) => read.Sessions(Actor, from, until, classId, ct,yearId);
     [HttpGet("attendance-sessions/{id:guid}/roster"), AspNetRole(Permission.AttendanceView)] public Task<object> Roster(Guid id, CancellationToken ct) => read.Roster(Actor, id, ct);
     [HttpPost("attendance-sessions/{id:guid}/check-ins"), AspNetRole(Permission.CheckIn)] public Task<CheckInResult> CheckIn(Guid id, CheckInInput input, CancellationToken ct) => sender.Send(new CheckInCommand(Actor, id, input), ct);
+    [HttpPost("attendance-sessions/{id:guid}/students/check-ins"), AspNetRole(Permission.CheckIn)] public Task<CheckInResult> StudentScan(Guid id,CheckInInput input,CancellationToken ct)=>sender.Send(new CheckInCommand(Actor,id,input with {PersonType="Student"}),ct);
+    [HttpPost("attendance-sessions/{id:guid}/catechists/check-ins"), AspNetRole(Permission.CheckIn|Permission.CatechistAttendance)] public Task<CheckInResult> TeacherScan(Guid id,CheckInInput input,CancellationToken ct)=>sender.Send(new CheckInCommand(Actor,id,input with {PersonType="Catechist"}),ct);
     [HttpPatch("attendance-records/{id:guid}"), AspNetRole(Permission.AttendanceCorrect)]
     public async Task<IActionResult> Correct(Guid id, CorrectionInput input, CancellationToken ct)
     {

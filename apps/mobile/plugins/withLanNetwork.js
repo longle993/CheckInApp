@@ -5,7 +5,7 @@ const {
 const fs = require("node:fs/promises");
 const path = require("node:path");
 
-module.exports = (config, { host }) => {
+module.exports = (config, { host, cleartext = true }) => {
   if (!/^[a-zA-Z0-9.-]+$/.test(host))
     throw new Error("Invalid LAN API hostname.");
   config = withAndroidManifest(config, (config) => {
@@ -27,7 +27,7 @@ module.exports = (config, { host }) => {
         `<?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
   <base-config cleartextTrafficPermitted="false" />
-  <domain-config cleartextTrafficPermitted="true">
+  <domain-config cleartextTrafficPermitted="${cleartext ? "true" : "false"}">
     <domain includeSubdomains="false">${host}</domain>
   </domain-config>
 </network-security-config>

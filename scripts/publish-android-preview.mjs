@@ -23,9 +23,7 @@ const apiUrl =
       "",
     ),
   ).apiUrl;
-const artifactUrl = new URL(apiUrl);
-artifactUrl.port = "8765";
-const origin = artifactUrl.origin;
+const origin = process.env.DOWNLOAD_ORIGIN ? new URL(process.env.DOWNLOAD_ORIGIN).origin : null;
 const metadata = {
   file: "CheckInApp-LAN.apk",
   sizeBytes: apk.length,
@@ -50,15 +48,15 @@ const requireWeb = createRequire(root + "apps/web/package.json");
 const React = requireWeb("react");
 const { renderToStaticMarkup } = requireWeb("react-dom/server");
 const { QRCodeSVG } = requireWeb("qrcode.react");
-const qr = renderToStaticMarkup(
+const qr = origin ? renderToStaticMarkup(
   React.createElement(QRCodeSVG, {
     value: origin + "/CheckInApp-LAN.apk",
     size: 200,
     marginSize: 4,
   }),
-);
+) : "";
 await fs.writeFile(
   target + "index.html",
-  `<!doctype html><html lang="vi"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>CheckInApp LAN</title><style>body{font:16px system-ui;margin:32px auto;padding:16px;max-width:640px;color:#222;background:#f4f4f6}main{background:white;padding:24px;border-radius:16px}a{color:#4338ca}.button{display:inline-block;padding:14px 20px;background:#4f46e5;color:white;border-radius:8px;text-decoration:none}code{overflow-wrap:anywhere;font-size:12px}small{color:#666}h1{font-size:26px}</style><main><h1>CheckInApp LAN</h1><p>Bản cài thử Android, có bundle sẵn; không cần Metro hoặc Expo Go.</p><p><a class="button" href="CheckInApp-LAN.apk">Tải APK · ${(apk.length / 1048576).toFixed(1)} MB</a></p>${qr}<p>Quét mã trên bằng camera điện thoại để tải APK.</p><p>API: <a href="${apiUrl.replace("/api/v1", "/health")}">${apiUrl.replace("/api/v1", "/health")}</a></p><p><a href="cards.html">Mở / in thẻ kiểm thử QR và Barcode</a></p><p>Android 7.0 trở lên, ARM64 hoặc ARM32. Hai thiết bị dùng cùng Wi-Fi. Nếu được hỏi, cho phép trình duyệt cài ứng dụng từ tệp này.</p><small>SHA-256</small><p><code>${sha256}</code></p><p><small>APK ký bằng khóa thử riêng trên máy này. Không có tài khoản hoặc mật khẩu được nhúng trong APK/trang tải.</small></p></main></html>`,
+  `<!doctype html><html lang="vi"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>CheckInApp Android</title><style>body{font:16px system-ui;margin:32px auto;padding:16px;max-width:640px;color:#222;background:#f4f4f6}main{background:white;padding:24px;border-radius:16px}a{color:#781f36}.button{display:inline-block;padding:14px 20px;background:#781f36;color:white;border-radius:8px;text-decoration:none}code{overflow-wrap:anywhere;font-size:12px}small{color:#666}h1{font-size:26px}</style><main><h1>CheckInApp Android</h1><p>Bản cài thử Android, có bundle sẵn; không cần Metro hoặc Expo Go.</p><p><a class="button" href="CheckInApp-LAN.apk">Tải APK · ${(apk.length / 1048576).toFixed(1)} MB</a></p>${qr}<p>Tải tệp APK tại trang này. Mã QR chỉ hiển thị khi đã cấu hình DOWNLOAD_ORIGIN truy cập được từ điện thoại.</p><p>API: <a href="${apiUrl.replace("/api/v1", "/health")}">${apiUrl.replace("/api/v1", "/health")}</a></p><p><a href="cards.html">Mở / in thẻ kiểm thử QR và Barcode</a></p><p>Android 7.0 trở lên, ARM64 hoặc ARM32. APK kết nối API qua HTTPS, không yêu cầu cùng Wi-Fi. Nếu được hỏi, cho phép trình duyệt cài ứng dụng từ tệp này.</p><small>SHA-256</small><p><code>${sha256}</code></p><p><small>APK ký bằng khóa thử riêng trên máy này. Không có tài khoản hoặc mật khẩu được nhúng trong APK/trang tải.</small></p></main></html>`,
 );
 console.log(JSON.stringify(metadata));
