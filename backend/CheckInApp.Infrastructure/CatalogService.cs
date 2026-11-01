@@ -63,6 +63,11 @@ public class CatalogService(AppDbContext db, AccessService access, ScheduleServi
                 y.EndDate = Date(d, "endDate");
                 if (y.EndDate < y.StartDate || y.EndDate.DayNumber - y.StartDate.DayNumber > 400)
                     throw Invalid("Khoảng năm học không hợp lệ.");
+                if(db.Database.IsSqlServer()) await db.Years.FromSqlRaw("SELECT * FROM [Years] WITH (UPDLOCK,HOLDLOCK)").LoadAsync(ct);
+                var overlap=await db.Years.FirstOrDefaultAsync(x=>x.Id!=y.Id && x.StartDate<=y.EndDate && y.StartDate<=x.EndDate,ct);
+                if(overlap!=null) throw new AppException(409,"YEAR_OVERLAP",$"Năm học trùng khoảng với {overlap.Name}: {overlap.StartDate:dd/MM/yyyy}–{overlap.EndDate:dd/MM/yyyy}.");
+                var affectedClasses=db.Classes.Where(x=>x.AcademicYearId==y.Id).Select(x=>x.Id);
+                if(await db.Sessions.AnyAsync(x=>affectedClasses.Contains(x.ClassRoomId)&&(x.Date<y.StartDate||x.Date>y.EndDate),ct)||await db.Schedules.AnyAsync(x=>affectedClasses.Contains(x.ClassRoomId)&&(x.From<y.StartDate||x.Until>y.EndDate),ct)) throw Invalid("Khoảng năm học mới không bao phủ lịch/buổi hiện có.");
                 y.IsActive = Flag(d, "isActive");
                 if (y.IsActive)
                 foreach (var other in await db.Years.Where(x => x.Id != y.Id && x.IsActive).ToListAsync(ct))

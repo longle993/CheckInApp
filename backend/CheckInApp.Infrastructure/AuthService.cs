@@ -107,11 +107,15 @@ public class AuthService(AppDbContext db, IConfiguration config, AccessService a
     {
         var u = await db.Users.AsNoTracking().SingleAsync(x => x.Id == id, ct);
         var rights = await access.Rights(id, ct);
+        var profile=await db.Catechists.AsNoTracking().FirstOrDefaultAsync(x=>x.UserId==id,ct);
         return new
         {
             id = u.Id,
             u.Email,
-            u.FullName,
+            fullName=profile?.FullName??u.FullName,
+            saintName=profile?.SaintName,
+            catechistId=profile?.Id,
+            roles=await (from ur in db.UserRoles join r in db.Roles on ur.RoleId equals r.Id where ur.UserId==id select r.Name).ToListAsync(ct),
             status = u.Status.ToString(),
             permissions = rights.Mask.ToString(),
             globalScope = rights.Global

@@ -73,7 +73,7 @@ public class ReadService(AppDbContext db, AccessService access, TimeProvider clo
                 await access.Require(actor, Permission.UserView, ct);
                 return new
                 {
-                    items = await db.Users.AsNoTracking().OrderByDescending(x => x.CreatedAtUtc).Take(100).Select(x => new { x.Id, x.FullName, x.Email, status = x.Status.ToString(), x.CreatedAtUtc, x.ApprovedAtUtc }).ToListAsync(ct)
+                    items = await db.Users.AsNoTracking().OrderByDescending(x => x.CreatedAtUtc).Take(100).Select(x => new { x.Id, x.FullName, x.Email, status = x.Status.ToString(), x.CreatedAtUtc, x.ApprovedAtUtc, profileVersion=db.Audit.Where(a=>a.EntityId==x.Id&&a.Action=="EditProfile").OrderByDescending(a=>a.CreatedAtUtc).ThenByDescending(a=>a.Id).Select(a=>(Guid?)a.Id).FirstOrDefault() }).ToListAsync(ct)
                 };
             case "schedules":
                 await access.Require(actor, Permission.ScheduleView, ct);

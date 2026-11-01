@@ -12,7 +12,7 @@ module.exports = ({ config }) => {
     android: {
       ...config.android,
       package: "com.checkinapp.mobile.preview",
-      versionCode: 2,
+      versionCode: 3,
       blockedPermissions: ["android.permission.RECORD_AUDIO"],
     },
     plugins: [

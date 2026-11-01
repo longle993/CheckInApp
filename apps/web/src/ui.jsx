@@ -9,12 +9,12 @@ import {
 } from "lucide-react";
 import { fmtDate } from "./api";
 import { createPortal } from "react-dom";
-export function Brand() {
+export function Brand({ auth = false }) {
   const [branding,setBranding]=useState({name:"CheckInApp",logoUrl:null});
   useEffect(()=>{let live=true;async function load(){try{const r=await fetch("/api/v1/web-settings");if(r.ok){const s=await r.json();if(live){setBranding(s);document.title=s.name;}}}catch{}}load();window.addEventListener("branding-updated",load);return()=>{live=false;window.removeEventListener("branding-updated",load);};},[]);
 
   return (
-    <a href="#tongquan" className="brand">
+    <a href="#tongquan" className={auth ? "brand auth-brand" : "brand"} aria-label={branding.name}>
       {branding.logoUrl ? <img src={branding.logoUrl} alt="" onError={()=>setBranding(s=>({...s,logoUrl:null}))} style={{width:32,height:32,objectFit:"contain"}}/> : <span className="mark">
         <svg
           viewBox="0 0 24 24"
@@ -28,7 +28,7 @@ export function Brand() {
           <path d="M15 4h5v5M4 15v5h5m6-3 2 2 4-5" />
         </svg>
       </span>}
-      {branding.name}
+      {!auth && branding.name}
     </a>
   );
 }

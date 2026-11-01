@@ -1,5 +1,11 @@
 # CheckInApp
 
+Thiết kế đang chờ triển khai: [đăng nhập web desktop/mobile ngày02/11/2026](docs/design-login-2026-11-02.md), theo ảnh tham khảo và nhận diện Xứ đoàn Thiên Thần Raphael.
+
+Bản hiện tại: [0.2.0 — hướng dẫn widget, báo cáo, avatar và in lô](docs/release-0.2.0.md).
+
+Đặc tả mở rộng đã triển khai bản0.2.0: [mở rộng tổng quan và chức năng ngày 01/11](docs/design-dashboard-expansion-2026-11-01.md).
+
 Đặc tả hợp nhất và yêu cầu mới: [nghiệp vụ + brief ngày 01/11/2026](docs/requirements-2026-11-01.md). Đã triển khai đợt 01/11; xem kết quả và giới hạn trong hướng dẫn mới.
 
 Chạy bản web và APK mới nhất: [hướng dẫn bản cập nhật 01/11/2026](docs/release-2026-11-01.md).
@@ -157,6 +163,6 @@ Chi tiết kết quả và đối chiếu giao diện: [docs/verification.md](do
 - [Expo Camera](https://docs.expo.dev/versions/latest/sdk/camera/)
 
 Token màu/font của web nằm trong `apps/web/src/styles.css` và `production.css`; theme mobile nằm trong `apps/mobile/App.js`. Các lớp/học sinh được tạo trong Development là dữ liệu giả.
-#   C h e c k I n A p p 
- 
- 
+# CheckInApp
+
+

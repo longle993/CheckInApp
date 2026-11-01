@@ -44,13 +44,14 @@ public class AdminService(AppDbContext db, AccessService access, TimeProvider cl
         if (catechistId != null)
         {
             var ca = await db.Catechists.SingleOrDefaultAsync(x => x.Id == catechistId, ct) ?? throw new AppException(400, "CATECHIST_INVALID", "Không có giáo lý viên.");
-            if (ca.UserId != null)
+            if (ca.UserId != null && ca.UserId != user.Id)
                 throw new AppException(409, "CATECHIST_LINKED", "Hồ sơ đã liên kết tài khoản.");
             ca.UserId = user.Id;
         }
         user.Status = AccountStatus.Active;
         user.ApprovedBy = actor;
         user.ApprovedAtUtc = clock.GetUtcNow().UtcDateTime;
+        db.UserRoles.RemoveRange(await db.UserRoles.Where(x=>x.UserId==user.Id).ToListAsync(ct));
         db.UserRoles.Add(new()
         {
             UserId = user.Id,

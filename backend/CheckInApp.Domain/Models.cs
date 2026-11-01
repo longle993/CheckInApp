@@ -10,7 +10,7 @@ public enum Permission : long
     RoleManage = 1L << 16, CredentialManage = 1L << 17, AssignmentManage = 1L << 18, AuditView = 1L << 19, UserCreate = 1L << 20,
     StudentImport = 1L << 21, StudentExport = 1L << 22, CatechistImport = 1L << 23, CatechistExport = 1L << 24,
     ClassImport = 1L << 25, ClassExport = 1L << 26, CatechistAttendance = 1L << 27,
-    WebSettingsView = 1L << 28, WebSettingsManage = 1L << 29
+    WebSettingsView = 1L << 28, WebSettingsManage = 1L << 29, UserManage = 1L << 30
 }
 public enum AccountStatus
 {

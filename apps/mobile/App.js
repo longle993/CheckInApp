@@ -1,5 +1,7 @@
+import DashboardWidgets from "./DashboardWidgets";
 import React, { useEffect, useRef, useState } from "react";
 import {
+  Image,
   ActivityIndicator,
   Alert,
   Pressable,
@@ -258,7 +260,7 @@ export default function App() {
       let pref=null;try{pref=JSON.parse(await SecureStore.getItemAsync("ci-class-"+user.id)||"null");}catch{}
       const wanted=typeof selectedYear==="string"?selectedYear:yearId;
       const remembered=pref?.expires>Date.now()&&yearData.items.some(y=>y.id===pref.year&&y.startDate<=day&&y.endDate>=day)?pref.year:"";
-      const selected=wanted||remembered||yearData.items.find(y=>y.isActive&&y.startDate<=day&&y.endDate>=day)?.id||yearData.items.filter(y=>y.startDate<=day&&y.endDate>=day).sort((a,b)=>b.startDate.localeCompare(a.startDate))[0]?.id;
+      const valid=yearData.items.filter(y=>y.startDate<=day&&y.endDate>=day);const selected=wanted||(valid.length===1?valid[0].id:"");
       if(!selected){setSessions([]);return;}setYearId(selected);setPreferredClass(pref?.year===selected&&pref.expires>Date.now()?pref.cls:"");
       const data = await request(
         "/attendance-sessions?from=" + day + "&until=" + day+"&yearId="+selected,
@@ -459,7 +461,7 @@ export default function App() {
         keyboardShouldPersistTaps="handled"
         refreshControl={undefined}
       >
-        {screen==="calendar"?<View style={s.card}><Text style={s.title}>Lịch điểm danh</Text><Text style={s.note}>Năm học: {years.find(y=>y.id===yearId)?.name||"Chưa chọn"}</Text><Button secondary onPress={async()=>{if(!yearId)return;const from=localToday(),until=new Date(Date.now()+7*86400000).toISOString().slice(0,10);try{const data=await request(`/attendance-sessions?from=${from}&until=${until}&yearId=${yearId}`);setCalendarRows(data.items);}catch(e){setError(e.message);}}}>Xem lịch 7 ngày</Button>{calendarRows.map(x=><View style={s.row} key={x.id}><Text style={s.note}>{x.date} · {x.className} · {time(x.opensAtUtc)}–{time(x.closesAtUtc)} · {x.studentAttendanceEnabled?"HS ":""}{x.catechistAttendanceEnabled?"GLV":""}{x.cancelled?" · Hủy":""}</Text></View>)}</View>:screen==="other"?<View style={s.card}><Text style={s.title}>Năm học và tài khoản</Text>{years.map(y=><Button key={y.id} secondary onPress={()=>{setSession(null);setPreferredClass("");setYearId(y.id);loadSessions(y.id);}}>{y.name}{yearId===y.id?" ✓":""}</Button>)}<Button secondary onPress={async()=>{await SecureStore.deleteItemAsync("ci-class-"+user.id);setPreferredClass("");Alert.alert("Đã xóa lựa chọn đã nhớ");}}>Xóa lớp đã nhớ</Button><Button onPress={()=>logout()}>Đăng xuất</Button></View>:screen==="home"?<View style={s.card}><Text style={s.title}>Tổng quan</Text><Text style={s.note}>Năm học: {years.find(y=>y.id===yearId)?.name||"Chọn trong Khác"}</Text><Button onPress={()=>{setScreen("hs");setSession(null);}}>Điểm danh thiếu nhi</Button><Button onPress={()=>{setScreen("glv");setSession(null);}}>Điểm danh giáo lý viên</Button></View>:session ? (
+        {screen==="attendance"?<View style={s.card}><Text style={s.title}>Điểm danh</Text><Button onPress={()=>setScreen("hs")}>Điểm danh thiếu nhi</Button><Button onPress={()=>setScreen("glv")}>Điểm danh giáo lý viên</Button></View>:screen==="calendar"?<View style={s.card}><Text style={s.title}>Lịch điểm danh</Text><Text style={s.note}>Năm học: {years.find(y=>y.id===yearId)?.name||"Chưa chọn"}</Text><Button secondary onPress={async()=>{if(!yearId)return;const from=localToday(),until=new Date(Date.now()+7*86400000).toISOString().slice(0,10);try{const data=await request(`/attendance-sessions?from=${from}&until=${until}&yearId=${yearId}`);setCalendarRows(data.items);}catch(e){setError(e.message);}}}>Xem lịch 7 ngày</Button>{calendarRows.map(x=><View style={s.row} key={x.id}><Text style={s.note}>{x.date} · {x.className} · {time(x.opensAtUtc)}–{time(x.closesAtUtc)} · {x.studentAttendanceEnabled?"HS ":""}{x.catechistAttendanceEnabled?"GLV":""}{x.cancelled?" · Hủy":""}</Text></View>)}</View>:screen==="other"?<View style={s.card}><Text style={s.title}>Năm học và tài khoản</Text><Text style={s.note}>CheckInApp 0.2.0 · Android build 3</Text>{years.map(y=><Button key={y.id} secondary onPress={()=>{setSession(null);setPreferredClass("");setYearId(y.id);loadSessions(y.id);}}>{y.name}{yearId===y.id?" ✓":""}</Button>)}<Button secondary onPress={async()=>{await SecureStore.deleteItemAsync("ci-class-"+user.id);setPreferredClass("");Alert.alert("Đã xóa lựa chọn đã nhớ");}}>Xóa lớp đã nhớ</Button><Button onPress={()=>logout()}>Đăng xuất</Button></View>:screen==="home"?<View style={s.card}><Text style={s.title}>Tổng quan</Text><Text style={s.note}>Năm học: {years.find(y=>y.id===yearId)?.name||"Chọn trong Khác"}</Text><Button onPress={()=>{setScreen("hs");setSession(null);}}>Điểm danh thiếu nhi</Button><Button onPress={()=>{setScreen("glv");setSession(null);}}>Điểm danh giáo lý viên</Button><DashboardWidgets request={request} user={user} sessions={sessions} yearName={years.find(y=>y.id===yearId)?.name} navigate={setScreen}/></View>:session ? (
           <>
             <Pressable
               onPress={() => {
@@ -596,7 +598,7 @@ export default function App() {
               {(tab === "recent" ? recent : missing).map((st) => (
                 <View key={st.studentId} style={s.row}>
                   <View style={{ flex: 1 }}>
-                    <Text style={s.name}>{[st.saintName,st.fullName].filter(Boolean).join(" ")}</Text>
+                    <Image source={{uri:BASE+"/people/students/"+st.studentId+"/avatar",headers:{Authorization:"Bearer "+token}}} style={{width:40,height:40,borderRadius:20,backgroundColor:T.border}}/><Text style={s.name}>{[st.saintName,st.fullName].filter(Boolean).join(" ")}</Text>
                     <Text style={s.note}>
                       {st.code} · {st.saintName || "Chưa có Tên Thánh"}
                     </Text>
@@ -615,7 +617,7 @@ export default function App() {
                 Buổi đang mở: chưa đến chưa kết luận là vắng.
               </Text>
             </View>}
-            {screen==="glv" && session.catechistAttendanceEnabled !== false && <View style={s.card}><Text style={s.heading}>Giáo lý viên</Text>{teacherRoster.map(t => <View key={t.id} style={s.row}><View style={{flex:1}}><Text style={s.name}>{[t.saintName,t.fullName].filter(Boolean).join(" ")}</Text><Text style={s.note}>{t.saintName || ""}</Text></View><Text style={s.note}>{t.record ? time(t.record.checkedInAtUtc) : "Chưa đến"}</Text></View>)}{!teacherRoster.length && <Text style={s.note}>Chưa có giáo lý viên được phân công.</Text>}</View>}
+            {screen==="glv" && session.catechistAttendanceEnabled !== false && <View style={s.card}><Text style={s.heading}>Giáo lý viên</Text>{teacherRoster.map(t => <View key={t.id} style={s.row}><Image source={{uri:BASE+"/people/catechists/"+t.id+"/avatar",headers:{Authorization:"Bearer "+token}}} style={{width:40,height:40,borderRadius:20,backgroundColor:T.border}}/><View style={{flex:1}}><Text style={s.name}>{[t.saintName,t.fullName].filter(Boolean).join(" ")}</Text><Text style={s.note}>{t.saintName || ""}</Text></View><Text style={s.note}>{t.record ? time(t.record.checkedInAtUtc) : "Chưa đến"}</Text></View>)}{!teacherRoster.length && <Text style={s.note}>Chưa có giáo lý viên được phân công.</Text>}</View>}
           </>
         ) : (
           <>
@@ -670,7 +672,7 @@ export default function App() {
           </>
         )}
       </ScrollView>
-      <View style={{flexDirection:"row",backgroundColor:T.surface,borderTopWidth:1,borderColor:T.border,paddingVertical:12}}>{[["home","Tổng quan"],["hs","Thiếu nhi"],["glv","GLV"],["calendar","Lịch"],["other","Khác"]].map(([id,label])=><Pressable key={id} accessibilityRole="tab" accessibilityState={{selected:screen===id}} style={{flex:1,alignItems:"center",padding:8}} onPress={()=>{setScreen(id);setSession(null);setCamera(false);setResult(null);setError("");}}><Svg width={20} height={20} viewBox="0 0 24 24"><Path fill="none" stroke={screen===id?T.primary:T.muted} strokeWidth={1.7} d={id==="home"?"M3 10 12 3l9 7v11h-6v-7H9v7H3Z":id==="calendar"?"M4 5h16v16H4ZM4 10h16M8 2v6M16 2v6":id==="other"?"M4 6h16M4 12h16M4 18h16":id==="glv"?"M12 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8M4 22v-3a8 8 0 0 1 16 0v3":"M3 8V3h5M16 3h5v5M21 16v5h-5M8 21H3v-5M7 12l3 3 7-7"}/></Svg><Text style={{color:screen===id?T.primary:T.muted,fontFamily:"Inter_600SemiBold",fontSize:12}}>{label}</Text></Pressable>)}</View>
+      <View style={{flexDirection:"row",backgroundColor:T.surface,borderTopWidth:1,borderColor:T.border,paddingVertical:12}}>{[["home","Tổng quan"],["attendance","Điểm danh"],["calendar","Lịch"],["other","Khác"]].map(([id,label])=><Pressable key={id} accessibilityRole="tab" accessibilityState={{selected:screen===id}} style={{flex:1,alignItems:"center",padding:8}} onPress={()=>{setScreen(id);setSession(null);setCamera(false);setResult(null);setError("");}}><Svg width={20} height={20} viewBox="0 0 24 24"><Path fill="none" stroke={screen===id?T.primary:T.muted} strokeWidth={1.7} d={id==="home"?"M3 10 12 3l9 7v11h-6v-7H9v7H3Z":id==="calendar"?"M4 5h16v16H4ZM4 10h16M8 2v6M16 2v6":id==="other"?"M4 6h16M4 12h16M4 18h16":id==="glv"?"M12 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8M4 22v-3a8 8 0 0 1 16 0v3":"M3 8V3h5M16 3h5v5M21 16v5h-5M8 21H3v-5M7 12l3 3 7-7"}/></Svg><Text style={{color:screen===id?T.primary:T.muted,fontFamily:"Inter_600SemiBold",fontSize:12}}>{label}</Text></Pressable>)}</View>
     </SafeAreaView>
   );
 }

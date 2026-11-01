@@ -32,9 +32,12 @@ import {
   ArrowRightLeft,
   Settings2,
   KeyRound,
+  Eye,
+  EyeOff,
 } from "lucide-react";
-import { QRCodeSVG } from "qrcode.react";
-import JsBarcode from "jsbarcode";
+
+
+
 import { displayPerson, api, can, setToken, clearToken, today, fmtDate, fmtTime } from "./api";
 import {
   Brand,
@@ -51,7 +54,12 @@ import "./styles.css";
 import "./production.css";
 import { ExcelActions, PresencePanel } from "./extensions";
 
+const BatchPrint=React.lazy(()=>import("./BatchPrint"));
+const TimingReport=React.lazy(()=>import("./TimingReport"));
+const DashboardPage = React.lazy(()=>import("./DashboardPage"));
+class RouteBoundary extends React.Component{state={error:false};static getDerivedStateFromError(){return {error:true}}render(){return this.state.error?<section role="alert"><p>Không tải được màn hình. Kiểm tra kết nối rồi tải lại.</p><Button onClick={()=>window.location.reload()}>Tải lại</Button></section>:this.props.children}}
 const permissionLabels = {
+  UserManage: "Sửa thông tin tài khoản / xem xét lại",
   WebSettingsView: "Xem thông tin web",
   WebSettingsManage: "Sửa tên và logo web",
   ClassView: "Xem lớp học",
@@ -89,7 +97,8 @@ const nav = [
   ["lop", "Lớp học", School, 0],
   ["hocsinh", "Học sinh", UsersRound, 2],
   ["lich", "Lịch", CalendarDays, 8],
-  ["baocao", "Báo cáo", ChartNoAxesCombined, 13],
+  ["baocao", "Báo cáo chuyên cần", ChartNoAxesCombined, 13],
+  ["baocao-gio", "Đi muộn về sớm", Clock3, 13],
   ["glv", "Giáo lý viên", UserRoundCheck, 4],
   ["namhoc", "Năm học", CalendarRange, 6],
   ["admin", "Admin Console", ShieldCheck, 14],
@@ -172,7 +181,10 @@ function Login({ onLogin, notice }) {
     [error, setError] = useState(""),
     [message, setMessage] = useState(""),
     [busy, setBusy] = useState(false);
+  const [showPassword,setShowPassword]=useState(false);
+  const desktop=typeof window!=="undefined"&&window.matchMedia("(min-width:960px)").matches;
   async function submit(e) {
+    if(busy){e.preventDefault();return;}
     e.preventDefault();
     setError("");
     setMessage("");
@@ -198,9 +210,7 @@ function Login({ onLogin, notice }) {
     }
   }
   return (
-    <div className="auth">
-      <div className="authbox">
-        <Brand />
+    <div className="auth auth-redesign"><div className="auth-shell"><section className="auth-identity" aria-label="Đơn vị sử dụng"><div className="auth-identity-content"><Brand auth/><p className="auth-parish">THIẾU NHI THÁNH THỂ GIÁO XỨ BÙI PHÁT</p><p className="auth-unit">XỨ ĐOÀN THIÊN THẦN RAPHAEL</p></div><svg className="auth-wave" viewBox="0 0 100 600" preserveAspectRatio="none" aria-hidden="true"><path fill="#ab6575" d="M45 0H100V600H45Q85 550 45 500T45 400T45 300T45 200T45 100T45 0"/><path fill="#d9b5bd" d="M66 0H100V600H66Q106 550 66 500T66 400T66 300T66 200T66 100T66 0"/><path fill="white" d="M85 0H100V600H85Q125 550 85 500T85 400T85 300T85 200T85 100T85 0"/></svg></section><section className="authbox">
         <h1>{register ? "Đăng ký tài khoản" : "Đăng nhập"}</h1>
         <p className="muted">
           {register
@@ -208,14 +218,14 @@ function Login({ onLogin, notice }) {
             : "Dùng tài khoản đã được admin duyệt."}
         </p>
         {notice && <p role="status" className="callout">{notice}</p>}
-        <form onSubmit={submit}>
+        <form onSubmit={submit} aria-busy={busy}>
           {register && (
             <div className="field">
               <label htmlFor="fullName">
                 Họ và tên <em>*</em>
               </label>
               <input
-                autoFocus
+                autoFocus={desktop}
                 id="fullName"
                 className="input"
                 name="fullName"
@@ -229,7 +239,7 @@ function Login({ onLogin, notice }) {
               Email <em>*</em>
             </label>
             <input
-              autoFocus={!register}
+              autoFocus={desktop&&!register}
               id="email"
               className="input"
               name="email"
@@ -243,11 +253,11 @@ function Login({ onLogin, notice }) {
             <label htmlFor="password">
               Mật khẩu <em>*</em>
             </label>
-            <input
+            <div className="auth-password"><input
               id="password"
               className="input"
               name="password"
-              type="password"
+              type={showPassword?"text":"password"}
               autoComplete={register ? "new-password" : "current-password"}
               minLength={register ? 12 : 1}
               maxLength={128}
@@ -255,7 +265,7 @@ function Login({ onLogin, notice }) {
                 register ? "Từ 12 ký tự, có chữ và số" : "Nhập mật khẩu"
               }
               required
-            />
+            /><Button className="auth-password-toggle" aria-label={showPassword?"Ẩn mật khẩu":"Hiện mật khẩu"} aria-pressed={showPassword} onClick={()=>setShowPassword(v=>!v)}>{showPassword?<EyeOff size={20}/>:<Eye size={20}/>}</Button></div>
           </div>
           {error && (
             <p className="form-error" role="alert">
@@ -273,8 +283,11 @@ function Login({ onLogin, notice }) {
         </form>
         <Button
           ghost
+          disabled={busy}
           onClick={() => {
             setRegister(!register);
+            setShowPassword(false);
+            setMessage("");
             setError("");
           }}
         >
@@ -283,7 +296,7 @@ function Login({ onLogin, notice }) {
             : "Chưa có tài khoản? Đăng ký"}
         </Button>
         <p className="small muted">Quên mật khẩu: liên hệ admin của đơn vị.</p>
-      </div>
+      </section></div>
     </div>
   );
 }
@@ -544,1445 +557,16 @@ function Dashboard() {
     </>
   );
 }
-function Scan({teacher=false}) {
-  const app=useApp();
-  const ask = useApp().ask;
-  const { sessionChoice, user, toast, refresh } = useApp();
-  const [date, setDate] = useState(today()),
-    [id, setId] = useState(sessionChoice || ""),
-    [result, setResult] = useState(null),
-    [error, setError] = useState(""),
-    [busy, setBusy] = useState(false),
-    [camera, setCamera] = useState(false),
-    [tab, setTab] = useState("recent"),
-    [code, setCode] = useState("");
-  const controls = useRef(null),
-    locked = useRef(false),
-    video = useRef(null),
-    pending = useRef(null);
-  const sessions = useData(
-    app.yearId ? "/attendance-sessions?" + query({ from: date, until: date,yearId:app.yearId,classId:app.classId }) : null,
-  );
-  const [rememberPrompt,setRememberPrompt]=useState(false);
-  const prefKey="ci-class-"+app.user.id+"-"+(teacher?"glv":"hs");
-  useEffect(()=>{try{const raw=document.cookie.split("; ").find(x=>x.startsWith(prefKey+"="));if(raw){const pref=JSON.parse(decodeURIComponent(raw.slice(prefKey.length+1)));if(pref.v===1&&pref.year===app.yearId&&app.classes.some(c=>c.id===pref.cls))app.setClassId(pref.cls);}}catch{}},[app.yearId,app.classes]);
-  const all = (sessions.data?.items || []).filter(s=>teacher?s.catechistAttendanceEnabled:s.studentAttendanceEnabled);
-  useEffect(() => {
-    if(!app.classId&&all.length){const preferred=all.filter(s=>s.status==="Open");const candidates=preferred.length?preferred:all.filter(s=>s.status==="Scheduled");const ids=[...new Set(candidates.map(s=>s.classRoomId))];if(ids.length===1)app.setClassId(ids[0]);else {setId("");return;}}
-    if (all.length && !all.some((s) => s.id === id)) setId(all.find(s=>s.status==="Open")?.id||all[0].id);
-    if (!all.length) setId("");
-  }, [sessions.data]);
-  const session = all.find((s) => s.id === id);
-  const roster = useData(!teacher&&id ? `/attendance-sessions/${id}/roster` : null);
-  useEffect(() => () => controls.current?.stop(), []);
-  useEffect(() => {
-    setResult(null);
-    setError("");
-    controls.current?.stop();
-    setCamera(false);
-    locked.current = false;
-    pending.current = null;
-  }, [id]);
-  async function submit(credential, method = "QR", retry = false) {
-    if (!retry && (teacher ? !credential.trim().startsWith("CG1-") : credential.trim().startsWith("CG1-"))){setError(teacher?"Vui lòng quét thẻ giáo lý viên.":"Vui lòng quét thẻ thiếu nhi.");return;}
-    if (locked.current && !retry) return;
-    locked.current = true;
-    controls.current?.stop();
-    setCamera(false);
-    setBusy(true);
-    setResult(null);
-    setError("");
-    pending.current = retry
-      ? pending.current
-      : {
-          personType:teacher?"Catechist":"Student",
-          credential: credential.trim(),
-          clientRequestId: crypto.randomUUID(),
-          method,
-        };
-    try {
-      const r = await api(`/attendance-sessions/${id}/${teacher?"catechists":"students"}/check-ins`, {
-        method: "POST",
-        body: pending.current,
-      });
-      setResult(r);
-      pending.current = null;
-      refresh();
-    } catch (e) {
-      setError(e.message);
-      if (e.status) pending.current = null;
-    } finally {
-      setBusy(false);
-    }
-  }
-  async function startCamera() {
-    setResult(null);
-    setError("");
-    locked.current = false;
-    setCamera(true);
-    try {
-      await new Promise((r) => setTimeout(r, 60));
-      const { BrowserMultiFormatReader } = await import("@zxing/browser");
-      const reader = new BrowserMultiFormatReader();
-      controls.current = await reader.decodeFromVideoDevice(
-        undefined,
-        video.current,
-        (r) => {
-          if (r && !locked.current)
-            submit(r.getText(), r.getBarcodeFormat() === 11 ? "QR" : "Barcode");
-        },
-      );
-    } catch {
-      setCamera(false);
-      setError(
-        "Không mở được camera. Kiểm tra quyền camera hoặc dùng đầu đọc USB.",
-      );
-    }
-  }
-  const students = roster.data?.items || [],
-    missing = students.filter((s) => !s.present),
-    recent = students
-      .filter((s) => s.present)
-      .sort((a, b) =>
-        String(b.recordedAtUtc).localeCompare(String(a.recordedAtUtc)),
-      );
-  return (
-    <>
-      <Head
-        title={"Điểm danh" + (session ? " " + session.className : "")}
-        subtitle={`${fmtDate(date)}${session ? " · " + fmtTime(session.opensAtUtc) + "–" + fmtTime(session.closesAtUtc) : ""}`}
-      />
-      <div className="filters"><Select label="Lớp điểm danh" value={app.classId} options={[{value:"",label:"Chọn lớp"},...app.classes.map(c=>({value:c.id,label:c.name}))]} onChange={v=>{app.setClassId(v);setRememberPrompt(true);}}/>
-
-        <DatePicker value={date} onChange={setDate} />
-        <Select
-          label="Chọn buổi"
-          value={id}
-          options={all.map((s) => ({
-            value: s.id,
-            label: s.className + " · " + fmtTime(s.opensAtUtc),
-          }))}
-          onChange={setId}
-        />
-        {session && <Status value={session.status} />}
-      </div>
-      {rememberPrompt&&app.classId&&<div className="callout"><span>Lưu lớp đã chọn cho lần sau?</span><Button onClick={()=>{document.cookie=prefKey+"="+encodeURIComponent(JSON.stringify({v:1,year:app.yearId,cls:app.classId}))+"; Path=/; Max-Age=2592000; SameSite=Lax"+(location.protocol==="https:"?"; Secure":"");setRememberPrompt(false);}}>Lưu lựa chọn</Button><Button onClick={()=>setRememberPrompt(false)}>Chỉ dùng lần này</Button></div>}
-      <Button ghost onClick={()=>{document.cookie=prefKey+"=; Path=/; Max-Age=0; SameSite=Lax";toast("Đã xóa lớp đã nhớ.");}}>Xóa lựa chọn đã nhớ</Button>
-      <State
-        loading={sessions.loading}
-        error={sessions.error}
-        onRetry={sessions.reload}
-        empty={
-          !sessions.loading &&
-          !sessions.error &&
-          !all.length &&
-          "Không có lịch điểm danh trong ngày này."
-        }
-      >
-        {session && (
-          <div className="split">
-            <section className="card">
-              <div className="between" style={{ marginBottom: 16 }}>
-                <h2>Quét thẻ {teacher?"giáo lý viên":"thiếu nhi"}</h2>
-                <span className="small muted">QR / Code 128</span>
-              </div>
-              <div className="camera">
-                <video
-                  ref={video}
-                  className={camera ? "live-video" : "hidden"}
-                  muted
-                  playsInline
-                />
-                {!camera && (
-                  <>
-                    <div className="aim">
-                      <ScanLine size={68} />
-                    </div>
-                    <small>
-                      {session.status === "Open"
-                        ? "Sẵn sàng quét thẻ"
-                        : "Buổi chưa mở hoặc đã kết thúc"}
-                    </small>
-                  </>
-                )}
-              </div>
-              {can(user, 11) && (
-                <div className="row" style={{ marginTop: 16 }}>
-                  <Button
-                    primary
-                    disabled={session.status !== "Open" || busy}
-                    onClick={startCamera}
-                  >
-                    <Camera />
-                    {result || error ? "Quét tiếp" : "Bật camera"}
-                  </Button>
-                  {camera && (
-                    <Button
-                      onClick={() => {
-                        controls.current?.stop();
-                        setCamera(false);
-                      }}
-                    >
-                      Dừng camera
-                    </Button>
-                  )}
-                </div>
-              )}
-              {result && (
-                <div className="scan-result" role="status">
-                  <CheckCircle2 />
-                  <div>
-                    <strong>
-                      {result.resultCode === "Created"
-                        ? "Đã điểm danh"
-                        : "Đã có kết quả điểm danh"}
-                    </strong>
-                    <p>
-                      {result.personType === "Catechist" ? "GLV · " : "HS · "}{result.studentName} · {result.studentCode}
-                    </p>
-                    <p>
-                      {result.present ? "Có mặt" : "Kết quả hiện tại: vắng"} ·{" "}
-                      {fmtTime(result.recordedAtUtc)}
-                    </p>
-                  </div>
-                </div>
-              )}
-              {error && (
-                <div className="form-error" role="alert">
-                  <AlertCircle />
-                  {error}
-                  {!pending.current ? (
-                    ""
-                  ) : (
-                    <Button onClick={() => submit("", undefined, true)}>
-                      Thử lại yêu cầu chưa lưu
-                    </Button>
-                  )}
-                </div>
-              )}
-              <form
-                className="manual-input row"
-                style={{ marginTop: 20 }}
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  locked.current = false;
-                  submit(code, "Barcode");
-                  setCode("");
-                }}
-              >
-                <input
-                  className="input"
-                  aria-label="Mã thẻ từ đầu đọc USB"
-                  placeholder="Mã thẻ / đầu đọc USB…"
-                  value={code}
-                  onChange={(e) => setCode(e.target.value)}
-                  required
-                />
-                <Button
-                  type="submit"
-                  disabled={
-                    busy || !id || session.status !== "Open" || !can(user, 11)
-                  }
-                >
-                  {busy ? "Đang lưu…" : "Kiểm tra"}
-                </Button>
-              </form>
-              <p className="small muted" style={{ marginTop: 12 }}>
-                Chỉ báo có mặt sau khi server xác nhận. Mất kết nối sẽ chưa tính
-                điểm danh.
-              </p>
-            </section>
-            {!teacher && <section className="card flush">
-              <div className="compactstats">
-                <div>
-                  <strong>{students.length - missing.length}</strong>
-                  <small>Đã đến</small>
-                </div>
-                <div>
-                  <strong>{missing.length}</strong>
-                  <small>Chưa đến</small>
-                </div>
-                <div>
-                  <strong>{students.length}</strong>
-                  <small>Sĩ số</small>
-                </div>
-              </div>
-              <div className="cardhead">
-                <div className="tabs">
-                  <a
-                    href="#"
-                    aria-current={tab === "recent" ? "page" : undefined}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      setTab("recent");
-                    }}
-                  >
-                    Vừa điểm danh
-                  </a>
-                  <a
-                    href="#"
-                    aria-current={tab === "missing" ? "page" : undefined}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      setTab("missing");
-                    }}
-                  >
-                    Chưa đến ({missing.length})
-                  </a>
-                </div>
-              </div>
-              <State {...roster} onRetry={roster.reload}>
-                <div className="list">
-                  {(tab === "missing" ? missing : recent).map((s) => (
-                    <div key={s.studentId} className="listrow">
-                      <span className="iconbox">
-                        <UserRoundCheck />
-                      </span>
-                      <div className="grow">
-                        <strong>{displayPerson(s)}</strong>
-                        <p>
-                          {s.code} · {s.saintName || "Chưa có Tên Thánh"}
-                        </p>
-                      </div>
-                      <span className="small muted num">
-                        {tab === "missing"
-                          ? "Chưa đến"
-                          : fmtTime(s.recordedAtUtc)}
-                      </span>
-                      {s.recordId && can(user, 12) && (
-                        <Button
-                          ghost
-                          className="icon"
-                          aria-label={"Điều chỉnh " + s.fullName}
-                          onClick={async () => {
-                            let reason = await ask({
-                              title: "Điều chỉnh điểm danh",
-                              message:
-                                s.fullName + " — đổi kết quả thành vắng.",
-                              input: true,
-                              inputLabel: "Lý do điều chỉnh",
-                            });
-                            if (!reason) return;
-                            try {
-                              await api("/attendance-records/" + s.recordId, {
-                                method: "PATCH",
-                                body: {
-                                  present: false,
-                                  version: s.version,
-                                  reason,
-                                },
-                              });
-                              refresh();
-                              toast("Đã điều chỉnh, có lưu nhật ký.");
-                            } catch (e) {
-                              toast(e.message);
-                            }
-                          }}
-                        >
-                          <Edit3 />
-                        </Button>
-                      )}
-                    </div>
-                  ))}
-                  {!(tab === "missing" ? missing : recent).length && (
-                    <p className="pad muted">
-                      Chưa có học sinh trong danh sách này.
-                    </p>
-                  )}
-                </div>
-              </State>
-            </section>}
-          </div>
-        )}
-      </State>
-      {session && session.studentAttendanceEnabled === false && <p className="callout">Buổi này chỉ điểm danh giáo lý viên.</p>}
-      {session && <PresencePanel teacherOnly={teacher} session={session} students={students} user={user} refresh={refresh} toast={toast} />}
-    </>
-  );
-}
-function CatalogPage({ type }) {
-  const app = useApp(),
-    [search, setSearch] = useState(""),
-    [page, setPage] = useState(1),
-    [pageSize, setPageSize] = useState(25),
-    [edit, setEdit] = useState(null),
-    [credential, setCredential] = useState(null);
-  let { classes, years, classId, setClassId, yearId, user } = app;
-  const kinds = {
-      lop: "classes",
-      hocsinh: "students",
-      glv: "catechists",
-      namhoc: "years",
-    },
-    kind = kinds[type];
-  const permission = { lop: 1, hocsinh: 3, glv: 5, namhoc: 7 }[type];
-  let data = useData(
-    "/catalog/" +
-      kind +
-      "?" +
-      query({
-        q: search,
-        page,
-        pageSize,
-        ...(type === "lop" ? { yearId } : {}),
-        ...(type === "hocsinh" ? { classId } : {}),
-      }),
-  );
-  useEffect(()=>{setPage(1);},[classId,yearId]);
-  let rows = data.data?.items || [];
-  const yearOptions = years.map((y) => ({ value: y.id, label: y.name })),
-    classOptions = classes.map((c) => ({ value: c.id, label: c.name }));
-  const fields = {
-    lop: [
-      { key: "name", label: "Tên lớp", required: true },
-      { key: "code", label: "Mã lớp", required: true },
-      {
-        key: "academicYearId",
-        label: "Năm học",
-        type: "select",
-        options: yearOptions,
-      },
-    ],
-    hocsinh: [
-      { key: "saintName", label: "Tên Thánh" },
-      { key: "familyName", label: "Họ và tên đệm" },
-      { key: "givenName", label: "Tên", required: true },
-      { key: "dateOfBirth", label: "Ngày sinh", type: "date" },
-      {
-        key: "classRoomId",
-        label: "Lớp học",
-        type: "select",
-        options: classOptions,
-      },
-    ],
-    glv: [
-      { key: "saintName", label: "Tên Thánh" },
-      { key: "familyName", label: "Họ và tên đệm" },
-      { key: "givenName", label: "Tên", required: true },
-    ],
-    namhoc: [
-      { key: "name", label: "Tên năm học", required: true },
-      { key: "startDate", label: "Ngày bắt đầu", type: "date" },
-      { key: "endDate", label: "Ngày kết thúc", type: "date" },
-      { key: "isActive", label: "Năm hiện hành", type: "boolean" },
-    ],
-  }[type];
-  function open(row = {}) {
-    setEdit({
-      ...row,
-      academicYearId: row.academicYearId || yearId || years[0]?.id,
-      classRoomId:
-        classId || row.enrollments?.[0]?.classRoomId || classes[0]?.id,
-      dateOfBirth: row.dateOfBirth || "2016-01-01",
-      startDate: row.startDate || today(),
-      endDate: row.endDate || today(),
-    });
-  }
-  const title = {
-    lop: "Lớp học",
-    hocsinh: "Học sinh",
-    glv: "Giáo lý viên",
-    namhoc: "Năm học",
-  }[type];
-  const cols =
-    type === "lop"
-      ? [
-          { label: "Lớp học", render: nameCell },
-          { label: "Sĩ số", key: "studentCount" },
-        ]
-      : type === "hocsinh"
-        ? [
-            { label: "Họ và tên đệm", key: "familyName" },
-            { label: "Tên", key: "givenName" },
-            { label: "Mã học sinh", key: "code" },
-            { label: "Tên Thánh", key: "saintName" },
-            { label: "Ngày sinh", render: (r) => fmtDate(r.dateOfBirth) },
-            {
-              label: "Lớp học",
-              render: (r) =>
-                classes.find((c) => c.id === r.enrollments?.[0]?.classRoomId)
-                  ?.name || "—",
-            },
-          ]
-        : type === "glv"
-          ? [
-              { label: "Họ và tên đệm", key: "familyName" },
-              { label: "Tên", key: "givenName" },
-              { label: "Tên Thánh", key: "saintName" },
-              {
-                label: "Tài khoản",
-                render: (r) => (
-                  <Badge kind={r.userId ? "ok" : "wait"}>
-                    {r.userId ? "Đã liên kết" : "Chưa liên kết"}
-                  </Badge>
-                ),
-              },
-            ]
-          : [
-              { label: "Năm học", key: "name" },
-              {
-                label: "Thời gian",
-                render: (r) => fmtDate(r.startDate) + "–" + fmtDate(r.endDate),
-              },
-              {
-                label: "Trạng thái",
-                render: (r) => (
-                  <Badge kind={r.isActive ? "ok" : "neutral"}>
-                    {r.isActive ? "Hiện hành" : "Không hiện hành"}
-                  </Badge>
-                ),
-              },
-            ];
-  cols.push({
-    label: "",
-    render: (r) => (
-      <div className="row wrap">
-        {can(user, permission) && (
-          <Button className="sm" onClick={() => open(r)}>
-            Chỉnh sửa
-          </Button>
-        )}
-        {type === "lop" && (
-          <Button
-            className="sm"
-            onClick={() => {
-              setClassId(r.id);
-              app.go("hocsinh");
-            }}
-          >
-            Học sinh
-          </Button>
-        )}
-        {(type === "hocsinh" || type === "glv") && can(user, 17) && (
-          <Button
-            className="sm"
-            onClick={async () => {
-              try {
-                setCredential({
-                  ...(await api((type === "glv" ? "/catechists/" : "/students/") + r.id + "/credential", {
-                    method: "POST",
-                  })),
-                  ...r,
-                  ...(type === "glv" ? { personType: "Catechist", code: "GLV-" + r.id.replaceAll("-", "").slice(0,8).toUpperCase(), enrollments: (data.data?.assignments || []).filter(a => a.catechistId === r.id && !a.until).map(a => ({classRoomId:a.classRoomId})) } : {}),
-                });
-                app.refresh();
-              } catch (e) {
-                app.toast(e.message);
-              }
-            }}
-          >
-            <QrCode />
-            Cấp thẻ
-          </Button>
-        )}
-        {type === "hocsinh" && can(user, 3) && (
-          <Button
-            className="sm"
-            onClick={() =>
-              setEdit({
-                transfer: true,
-                enrollmentId: r.enrollments?.[0]?.id,
-                classRoomId: "",
-                from: today(),
-              })
-            }
-          >
-            <ArrowRightLeft />
-            Chuyển lớp
-          </Button>
-        )}
-      </div>
-    ),
-  });
-  return (
-    <>
-      <Head
-        title={title}
-        subtitle="Quản lý dữ liệu theo năm học và phạm vi được phân công."
-      >
-        {can(user, permission) && (
-          <Button primary onClick={() => open()}>
-            <Plus />
-            {type === "lop" ? "Tạo lớp học" : "Thêm " + title.toLowerCase()}
-          </Button>
-        )}
-      </Head>
-
-      <div className="filters">
-        <input
-          className="input search"
-          aria-label={"Tìm " + title.toLowerCase()}
-          placeholder="Tìm tên hoặc mã…"
-          value={search}
-          onChange={(e) => {
-            setSearch(e.target.value);
-            setPage(1);
-          }}
-        />
-        {type === "hocsinh" && (
-          <Select
-            label="Lớp học"
-            value={classId}
-            onChange={(v) => {
-              setClassId(v);
-              setPage(1);
-            }}
-            options={[{ value: "", label: "Toàn bộ lớp" }, ...classOptions]}
-          />
-        )}
-      <ExcelActions kind={kind} user={user} classId={classId} className={classes.find(c => c.id === classId)?.name} classes={classes} onClassChange={setClassId} yearId={yearId} refresh={app.refresh} toast={app.toast} />
-      </div>
-      <div className="catalog-pagination">
-        <span>Số dòng mỗi trang</span><Select label="Số dòng mỗi trang" value={String(pageSize)} onChange={v=>{setPageSize(Number(v));setPage(1);}} options={[...new Set([10,25,50,100,...Array.from({length:Math.min(18,Math.ceil((data.data?.total||0)/50))},(_,i)=>(i+3)*50),pageSize])].sort((a,b)=>a-b).map(n=>({value:String(n),label:String(n)}))}/>
-        <nav className="row wrap" aria-label="Phân trang danh sách">
-          <Button className="sm" disabled={data.loading || page <= 1} onClick={()=>setPage(p=>p-1)}>Trước</Button>
-          {Array.from({length:Math.max(1,Math.ceil((data.data?.total ?? rows.length)/pageSize))},(_,i)=>i+1).filter(n=>n===1 || n===Math.max(1,Math.ceil((data.data?.total ?? rows.length)/pageSize)) || Math.abs(n-page)<=2).map((n,i,list)=><React.Fragment key={n}>{i>0 && n-list[i-1]>1 && <span aria-hidden="true">…</span>}<Button className="sm" primary={n===page} aria-label={"Trang "+n} aria-current={n===page?"page":undefined} disabled={data.loading} onClick={()=>setPage(n)}>{n}</Button></React.Fragment>)}
-          <Button className="sm" disabled={data.loading || page>=Math.max(1,Math.ceil((data.data?.total ?? rows.length)/pageSize))} onClick={()=>setPage(p=>p+1)}>Sau</Button>
-        </nav>
-        <span className="small muted" aria-live="polite">{data.data?.total ?? rows.length} bản ghi · Trang {page}/{Math.max(1,Math.ceil((data.data?.total ?? rows.length)/pageSize))}</span>
-      </div>
-      <State
-        {...data}
-        empty={!data.loading && !data.error && !rows.length}
-        onRetry={data.reload}
-      >
-        <Table rows={rows} columns={cols} />
-      </State>
-      {type === "glv" && can(user, 18) && <Assignments data={data.data} />}{" "}
-      {edit && (
-        <Editor
-          title={
-            edit.transfer
-              ? "Chuyển lớp"
-              : (edit.id ? "Chỉnh sửa " : "Thêm ") + title.toLowerCase()
-          }
-          fields={
-            edit.transfer
-              ? [
-                  {
-                    key: "classRoomId",
-                    label: "Lớp mới",
-                    type: "select",
-                    options: classOptions,
-                  },
-                  { key: "from", label: "Hiệu lực từ", type: "date" },
-                ]
-              : fields
-          }
-          initial={edit}
-          kind={edit.transfer ? "transfers" : kind}
-          id={edit.id}
-          onSaved={(saved) => {
-            if (type === "lop" && !edit.id) {
-              app.setYearId(saved.academicYearId);
-              setSearch(saved.code);
-              setPage(1);
-            }
-          }}
-          onClose={() => setEdit(null)}
-        />
-      )}{" "}
-      {credential && (
-        <CredentialCard
-          student={credential}
-          onClose={() => setCredential(null)}
-        />
-      )}
-    </>
-  );
-}
-function CredentialCard({ student, onClose }) {
-  const barcode = useRef();
-  const teacher = student.personType === "Catechist";
-  const { classes, years } = useApp();
-  const [format, setFormat] = useState("QR");
-  const cls = classes.find(c => c.id === student.enrollments?.[0]?.classRoomId);
-  const year = years.find(y => y.id === cls?.academicYearId);
-  useEffect(() => {
-    if (barcode.current) JsBarcode(barcode.current, student.credential, {
-      format: "CODE128",
-      height: 60,
-      width: 1.5,
-      displayValue: false,
-      margin: 10,
-    });
-  }, [format]);
-  return (
-    <Modal title={(teacher ? "Thẻ giáo lý viên" : "Thẻ học sinh") + " · 86 × 50 mm"} onClose={onClose}>
-      <Select label="Định dạng thẻ" value={format} onChange={setFormat} options={[{value:"QR",label:"QR Code"},{value:"Barcode",label:"Barcode (Code 128)"}]} />
-      <div id="print-card" className={"student-card " + (format === "QR" ? "qr" : "barcode")}>
-        <div className="card-information"><strong>CheckInApp · {teacher ? "THẺ GIÁO LÝ VIÊN" : "THẺ HỌC SINH"}</strong><h3>{displayPerson(student)}</h3>{!teacher && <p>Ngày sinh: {fmtDate(student.dateOfBirth)}</p>}<p>Mã {teacher ? "GLV" : "HS"}: {student.code}</p><p>Lớp: {student.className || cls?.name || "—"}</p><p>Năm học: {student.academicYearName || year?.name || "—"}</p></div>
-        <div className="card-symbol">{format === "QR" ? <QRCodeSVG value={student.credential} size={100} marginSize={4} level="M" /> : <svg ref={barcode} />}</div>
-      </div>
-      <p className="small muted">In tỷ lệ 100%, tắt header/footer; chọn Lưu PDF để xuất file thẻ.</p>
-      <p className="small muted">
-        Mã chỉ hiển thị một lần. Thẻ cũ đã được thu hồi. In hoặc lưu thẻ trước
-        khi đóng.
-      </p>
-      <div className="modal-actions">
-        <Button onClick={onClose}>Đóng</Button>
-        <Button primary onClick={() => window.print()}>
-          In thẻ
-        </Button>
-      </div>
-    </Modal>
-  );
-}
-function Assignments({ data }) {
-  const { classes, user } = useApp(),
-    [edit, setEdit] = useState(false);
-  return (
-    <div className="card">
-      <div className="between">
-        <h2>Phân công phụ trách lớp</h2>
-        <Button onClick={() => setEdit(true)}>
-          <Plus />
-          Phân công
-        </Button>
-      </div>
-      <div className="list" style={{ marginTop: 16 }}>
-        {(data?.assignments || []).map((a) => (
-          <div className="listrow" key={a.id}>
-            <div className="grow">
-              <strong>
-                {displayPerson(data?.items.find((c) => c.id === a.catechistId))}
-              </strong>
-              <p>
-                {classes.find((c) => c.id === a.classRoomId)?.name} · Từ{" "}
-                {fmtDate(a.from)}
-              </p>
-            </div>
-          </div>
-        ))}
-      </div>
-      {edit && (
-        <Editor
-          title="Phân công giáo lý viên"
-          kind="assignments"
-          initial={{
-            from: today(),
-            classRoomId: classes[0]?.id,
-            catechistId: data?.items[0]?.id,
-          }}
-          fields={[
-            {
-              key: "classRoomId",
-              label: "Lớp",
-              type: "select",
-              options: classes.map((c) => ({ value: c.id, label: c.name })),
-            },
-            {
-              key: "catechistId",
-              label: "Giáo lý viên",
-              type: "select",
-              options: (data?.items || []).map((c) => ({
-                value: c.id,
-                label: displayPerson(c),
-              })),
-            },
-            { key: "from", label: "Từ ngày", type: "date" },
-          ]}
-          onClose={() => setEdit(false)}
-        />
-      )}
-    </div>
-  );
-}
-function SessionScheduleEditor({session,onClose}) {
-  const app=useApp(),local=s=>new Date(new Date(s.endsWith("Z")?s:s+"Z").getTime()+7*3600000).toISOString().slice(11,16);
-  const [date,setDate]=useState(session.date),[open,setOpen]=useState(local(session.opensAtUtc)),[close,setClose]=useState(local(session.closesAtUtc)),[hs,setHs]=useState(session.studentAttendanceEnabled),[glv,setGlv]=useState(session.catechistAttendanceEnabled),[reason,setReason]=useState(""),[error,setError]=useState(""),[busy,setBusy]=useState(false);
-  async function save(e){e.preventDefault();setBusy(true);setError("");try{await api(`/attendance-sessions/${session.id}/schedule`,{method:"PUT",body:{date,opensAt:open+":00",closesAt:close+":00",studentAttendanceEnabled:hs,catechistAttendanceEnabled:glv,reason,version:session.version}});app.refresh();app.toast("Đã cập nhật lịch buổi học.");onClose(date);}catch(e){setError(e.message);}finally{setBusy(false);}}
-  return <Modal title={"Chỉnh lịch · "+session.className+" · "+fmtDate(session.date)} onClose={()=>{if(!busy)onClose();}}><form onSubmit={save} className="stack"><p className="small muted">Giờ Việt Nam. Ngày giờ bắt đầu mới phải lớn hơn hiện tại.</p><label className="field">Ngày học<input type="date" className="input" required value={date} onChange={e=>setDate(e.target.value)}/></label><label className="field">Giờ bắt đầu<input className="input" required type="time" value={open} onChange={e=>setOpen(e.target.value)}/></label><label className="field">Giờ kết thúc<input className="input" required type="time" value={close} onChange={e=>setClose(e.target.value)}/></label><label className="row"><input type="checkbox" className="check" checked={hs} onChange={e=>setHs(e.target.checked)}/>HS — Điểm danh học sinh</label><label className="row"><input type="checkbox" className="check" checked={glv} onChange={e=>setGlv(e.target.checked)}/>GLV — Điểm danh giáo lý viên</label><label className="field">Lý do điều chỉnh<input className="input" required maxLength={500} value={reason} onChange={e=>setReason(e.target.value)}/></label>{error&&<p className="form-error" role="alert">{error}</p>}<div className="modal-actions"><Button disabled={busy} onClick={onClose}>Hủy</Button><Button primary type="submit" disabled={busy}>Lưu lịch</Button></div></form></Modal>;
-}
-function Schedule() {
-  const app = useApp(),
-    [edit, setEdit] = useState(null),
-    [sessionEdit,setSessionEdit]=useState(null),
-    [highlighted,setHighlighted]=useState(""),
-    [exception, setException] = useState(false),
-    [from, setFrom] = useState(today().slice(0, 8) + "01");
-  const until = new Date(
-    Number(from.slice(0, 4)),
-    Number(from.slice(5, 7)),
-    0,
-    12,
-  )
-    .toISOString()
-    .slice(0, 10);
-  const data = useData(
-      "/attendance-sessions?" + query({ from, until, classId: app.classId,yearId:app.yearId }),
-    ),
-    schedules = useData(
-      "/catalog/schedules?" + query({ classId: app.classId,yearId:app.yearId }),
-    );
-  const cls = app.classes.find((c) => c.id === app.classId),
-    year = app.years.find((y) => y.id === cls?.academicYearId);
-  const activeSchedule = schedules.data?.items?.find(
-    (s) => s.classRoomId === cls?.id,
-  );
-  const exceptionSchedule=schedules.data?.items?.find(s=>s.id===exception)||activeSchedule;
-  return (
-    <>
-      <Head
-        title="Lịch điểm danh"
-        subtitle="Chỉ những ngày có buổi; ngày nghỉ không tính chuyên cần."
-      >
-        {can(app.user, 9) && (
-          <>
-            <Button disabled={!cls} onClick={()=>setEdit({classRoomId:cls.id,from:today(),until:year?.endDate||today(),daysMask:1,opensAt:"09:00",closesAt:"10:00",studentAttendanceEnabled:true,catechistAttendanceEnabled:true})}>Thêm khung lịch</Button>
-            <Button disabled={!cls} onClick={() => setException(true)}>
-              Ngày nghỉ / bổ sung
-            </Button>
-            <Button
-              primary
-              disabled={!cls}
-              onClick={() =>
-                setEdit({
-                  ...activeSchedule,
-                  classRoomId: cls.id,
-                  from: activeSchedule?.from || year?.startDate || today(),
-                  until: activeSchedule?.until || year?.endDate || today(),
-                  daysMask: activeSchedule?.daysMask ?? 1,
-                  studentAttendanceEnabled: activeSchedule?.studentAttendanceEnabled ?? true,
-                  catechistAttendanceEnabled: activeSchedule?.catechistAttendanceEnabled ?? true,
-                  opensAt: activeSchedule?.opensAt?.slice(0, 5) || "09:00",
-                  closesAt: activeSchedule?.closesAt?.slice(0, 5) || "09:30",
-                })
-              }
-            >
-              <Settings2 />
-              Cấu hình lịch
-            </Button>
-          </>
-        )}
-      </Head>
-      <div className="filters">
-        <Select
-          label="Lớp"
-          value={app.classId}
-          onChange={app.setClassId}
-          options={[
-            { value: "", label: "Toàn bộ lớp" },
-            ...app.classes.map((c) => ({ value: c.id, label: c.name })),
-          ]}
-        />
-        <DatePicker
-          value={from}
-          onChange={(d) => setFrom(d.slice(0, 8) + "01")}
-          label="Tháng xem lịch"
-        />
-      </div>
-      <State
-        {...data}
-        onRetry={data.reload}
-        empty={!data.loading && !data.error && !data.data?.items?.length}
-      >
-        <div className="card flush calendar-list">
-          {data.data?.items.map((s) => (
-            <div className={"calendar-row "+(highlighted===s.id?"updated-session":"")} key={s.id}>
-              <div className="datebox">
-                <small>{s.date.slice(5, 7)}</small>
-                <strong>{s.date.slice(8, 10)}</strong>
-              </div>
-              <div>
-                <h3>{s.className}</h3>
-                <p>
-                  {fmtTime(s.opensAtUtc)}–{fmtTime(s.closesAtUtc)}
-                </p>
-                <p>Điểm danh: {[s.studentAttendanceEnabled !== false && "HS", s.catechistAttendanceEnabled !== false && "GLV"].filter(Boolean).join(" + ")}</p>
-                {s.cancelled && <p>Buổi hủy · không tính chuyên cần</p>}
-              </div>
-              <div className="row wrap"><Status value={s.status} />{can(app.user,9)&&<Button className="sm" disabled={s.cancelled || new Date(s.opensAtUtc.endsWith("Z")?s.opensAtUtc:s.opensAtUtc+"Z").getTime()<=Date.now()} onClick={()=>setSessionEdit(s)}><Edit3/>Chỉnh lịch</Button>}</div>
-            </div>
-          ))}
-        </div>
-      </State>
-      <div className="stack">{schedules.data?.items?.map(s=><div className="row wrap" key={s.id}><span>{app.classes.find(c=>c.id===s.classRoomId)?.name} · {s.opensAt}–{s.closesAt}</span><Button onClick={()=>setEdit({...s,opensAt:s.opensAt.slice(0,5),closesAt:s.closesAt.slice(0,5)})}>Sửa khung lịch</Button><Button onClick={()=>setException(s.id)}>Nghỉ / bổ sung khung này</Button></div>)}</div>
-      {sessionEdit&&<SessionScheduleEditor session={sessionEdit} onClose={date=>{if(typeof date==="string"){setFrom(date.slice(0,8)+"01");setHighlighted(sessionEdit.id);}setSessionEdit(null);}}/>}
-      {edit && (
-        <Editor
-          title="Cấu hình lịch điểm danh"
-          kind="schedules"
-          id={edit.id}
-          initial={edit}
-          fields={[
-            { key: "studentAttendanceEnabled", label: "HS — Điểm danh học sinh", type: "boolean" },
-            { key: "catechistAttendanceEnabled", label: "GLV — Điểm danh giáo lý viên", type: "boolean" },
-            { key: "daysMask", label: "Các thứ cần điểm danh", type: "days" },
-            { key: "from", label: "Hiệu lực từ", type: "date" },
-            { key: "until", label: "Đến ngày", type: "date" },
-            { key: "opensAt", label: "Giờ mở (HH:mm)", required: true },
-            { key: "closesAt", label: "Giờ đóng (HH:mm)", required: true },
-          ]}
-          onClose={() => setEdit(null)}
-        />
-      )}{" "}
-      {exception && (
-        <Editor
-          title="Ngày nghỉ hoặc buổi bổ sung"
-          kind="exceptions"
-          initial={{
-            classRoomId: exceptionSchedule?.classRoomId,
-            scheduleId: exceptionSchedule?.id,
-            date: today(),
-            cancelled: true,
-            studentAttendanceEnabled: activeSchedule?.studentAttendanceEnabled ?? true,
-            catechistAttendanceEnabled: activeSchedule?.catechistAttendanceEnabled ?? true,
-            reason: "",
-          }}
-          fields={[
-            {key:"scheduleId",label:"Khung lịch áp dụng",type:"select",options:(schedules.data?.items||[]).filter(s=>s.classRoomId===exceptionSchedule?.classRoomId).map(s=>({value:s.id,label:s.opensAt+"–"+s.closesAt}))},
-            { key: "date", label: "Ngày", type: "date" },
-            {
-              key: "cancelled",
-              label: "Nghỉ học",
-              type: "boolean",
-              hint: "Hủy buổi ngày này (bỏ chọn để thêm buổi)",
-            },
-            { key: "studentAttendanceEnabled", label: "HS — Điểm danh học sinh", type: "boolean" },
-            { key: "catechistAttendanceEnabled", label: "GLV — Điểm danh giáo lý viên", type: "boolean" },
-            { key: "reason", label: "Lý do", required: true },
-          ]}
-          onClose={() => setException(false)}
-        />
-      )}
-    </>
-  );
-}
-function Report() {
-  const app = useApp(),
-    [from, setFrom] = useState(
-      app.years.find((y) => y.id === app.yearId)?.startDate ||
-        today().slice(0, 4) + "-01-01",
-    ),
-    [until, setUntil] = useState(today()),
-    [tab, setTab] = useState("all"),
-    [missingDate, setMissingDate] = useState(today()),
-    [sid, setSid] = useState("");
-  const report = useData(
-    "/reports/attendance?" +
-      query({
-        from,
-        until,
-        yearId: app.yearId,
-        classId: tab === "all" ? "" : app.classId,
-      }),
-  );
-  const sessions = useData(
-    tab === "missing"
-      ? "/attendance-sessions?" +
-          query({ from: missingDate, until: missingDate, classId: app.classId })
-      : null,
-  );
-  useEffect(() => {
-    let items = sessions.data?.items || [];
-    setSid(items[0]?.id || "");
-  }, [sessions.data]);
-  const roster = useData(
-    tab === "missing" && sid ? "/attendance-sessions/" + sid + "/roster" : null,
-  );
-  let r = report.data,
-    rows =
-      tab === "all"
-        ? r?.classes || []
-        : tab === "missing"
-          ? (roster.data?.items || [])
-              .filter((s) => !s.present)
-              .map((s) => ({
-                ...s,
-                expected: 0,
-                present: 0,
-                absent: 0,
-                rate: null,
-                ...r?.students?.find(
-                  (st) =>
-                    st.studentId === s.studentId &&
-                    st.classId ===
-                      sessions.data?.items?.find(
-                        (session) => session.id === sid,
-                      )?.classRoomId,
-                ),
-              }))
-          : r?.students || [];
-  function csv() {
-    let output = [
-      ["Tên Thánh và họ tên", "Mã", "Có mặt (buổi)", "Vắng (buổi)", "Buổi hợp lệ", "Tỷ lệ", "Ngày đủ", "Ngày chưa đủ", "Ngày một phần"],
-      ...rows.map((x) => [
-        displayPerson(x),
-        x.code,
-        x.present,
-        x.absent,
-        x.expected,
-        rate(x.rate),x.presentDays,x.absentDays,x.partialDays,
-      ]),
-    ]
-      .map((row) =>
-        row
-          .map(
-            (x) =>
-              '"' +
-              String(x ?? "")
-                .replace(/^[=+@-]/, "'$&")
-                .replaceAll('"', '""') +
-              '"',
-          )
-          .join(","),
-      )
-      .join("\r\n");
-    let url = URL.createObjectURL(
-      new Blob(["\ufeff" + output], { type: "text/csv;charset=utf-8" }),
-    );
-    let a = document.createElement("a");
-    a.href = url;
-    a.download = "chuyen-can.csv";
-    a.click();
-    URL.revokeObjectURL(url);
-  }
-  return (
-    <>
-      <Head
-        title={
-          tab === "all"
-            ? "Chuyên cần các lớp"
-            : tab === "missing"
-              ? "Học sinh chưa điểm danh"
-              : "Chuyên cần từng lớp"
-        }
-        subtitle="Chỉ tính buổi hợp lệ đã kết thúc; mẫu số theo roster từng buổi."
-      >
-        <Button disabled={!rows.length} onClick={csv}>
-          <Download />
-          Xuất CSV
-        </Button>
-      </Head>
-      <div className="filters">
-        <DatePicker label="Từ ngày" value={from} onChange={setFrom} />
-        <DatePicker label="Đến ngày" value={until} onChange={setUntil} />
-        <Select
-          label="Lớp học"
-          value={app.classId}
-          onChange={app.setClassId}
-          options={[
-            { value: "", label: "Toàn bộ lớp" },
-            ...app.classes.map((c) => ({ value: c.id, label: c.name })),
-          ]}
-        />
-      </div>
-      <div className="tabs">
-        {[
-          ["all", "Các lớp"],
-          ["class", "Từng lớp"],
-          ["missing", "Chưa điểm danh"],
-        ].map(([key, label]) => (
-          <a
-            key={key}
-            href="#"
-            aria-current={tab === key ? "page" : undefined}
-            onClick={(e) => {
-              e.preventDefault();
-              setTab(key);
-              if (key !== "all" && !app.classId && app.classes.length)
-                app.setClassId(app.classes[0].id);
-            }}
-          >
-            {label}
-          </a>
-        ))}
-      </div>
-      {tab === "missing" ? (
-        <div className="filters">
-          <DatePicker
-            label="Ngày cần xem chưa điểm danh"
-            value={missingDate}
-            onChange={setMissingDate}
-          />
-          <Select
-            label="Buổi cần xem"
-            value={sid}
-            onChange={setSid}
-            options={(sessions.data?.items || []).map((s) => ({
-              value: s.id,
-              label: s.className + " · " + fmtTime(s.opensAtUtc),
-            }))}
-          />
-          <p className="small muted">
-            Chưa đến trong buổi đang mở chưa kết luận là vắng.
-          </p>
-        </div>
-      ) : (
-        <Stats
-          items={[
-            ["Lượt hợp lệ", r?.totalExpected, "Theo roster", CalendarDays],
-            ["Có mặt", r?.totalPresent, "Lượt đã xác nhận", UserRoundCheck],
-            ["Vắng", r?.totalAbsent, "Buổi hợp lệ − có mặt", UsersRound],
-            [
-              "Chuyên cần",
-              rate(r?.rate),
-              "Tỷ lệ tổng lượt, không trung bình tỷ lệ lớp",
-              ChartNoAxesCombined,
-            ],
-          ]}
-        />
-      )}
-      <State
-        loading={
-          report.loading ||
-          (tab === "missing" && (sessions.loading || roster.loading))
-        }
-        error={report.error || sessions.error || roster.error}
-        onRetry={() => {
-          report.reload();
-          sessions.reload();
-          roster.reload();
-        }}
-        empty={!report.loading && !rows.length}
-      >
-        <Table
-          rows={rows}
-          rowKey={tab === "all" ? "classId" : "studentId"}
-          columns={[
-            { label: tab === "all" ? "Lớp học" : "Học sinh", render: nameCell },
-            ...(tab === "all"
-              ? []
-              : [{ label: "Tên Thánh", key: "saintName" }]),
-            { label: "Có mặt (buổi)", key: "present" },
-            { label: "Vắng (buổi)", key: "absent" },
-            ...(tab!=="all"?[{label:"Ngày đủ",key:"presentDays"},{label:"Ngày chưa đủ",key:"absentDays"}]:[]),
-            { label: "Buổi hợp lệ", key: "expected" },
-            { label: "Tỷ lệ", render: (r) => rate(r.rate) },
-          ]}
-        />
-        {tab === "class" && (
-          <div className="card" style={{ marginTop: 24 }}>
-            <h2>Chi tiết theo buổi</h2>
-            <p className="small muted">Chỉ những ngày có lịch đã kết thúc.</p>
-            {rows.map((s) => (
-              <details className="report-person" key={s.studentId}>
-                <summary>
-                  <strong>{displayPerson(s)}</strong>
-                  <span className="muted small">
-                    {s.present}/{s.expected} có mặt · {s.absent} vắng
-                  </span>
-                </summary>
-                <div className="date-results">
-                  {s.days?.map((d) => (
-                    <div key={d.date} className="between">
-                      <span>{fmtDate(d.date)}</span>
-                      <Badge kind={d.present ? "ok" : "wait"}>
-                        {d.present ? "Có mặt" : "Vắng"}
-                      </Badge>
-                    </div>
-                  ))}
-                  {!s.days?.length && (
-                    <p className="muted small">Chưa có buổi hợp lệ.</p>
-                  )}
-                </div>
-              </details>
-            ))}
-          </div>
-        )}
-      </State>
-      <p className="small muted">
-        Có mặt + Vắng = Lượt hợp lệ. Không tính buổi hủy, tương lai hoặc trước
-        ngày ghi danh.
-      </p>
-    </>
-  );
-}
-function Users() {
-  const app = useApp(),
-    users = useData("/catalog/users"),
-    roles = useData(can(app.user, 16) ? "/catalog/roles" : null),
-    catechists = useData(can(app.user, 4) ? "/catalog/catechists" : null);
-  const [create, setCreate] = useState(false);
-  const [review, setReview] = useState(null),
-    [roleId, setRoleId] = useState(""),
-    [catechistId, setCatechistId] = useState(""),
-    [error, setError] = useState(""),
-    [busy, setBusy] = useState(false),
-    [filter, setFilter] = useState("PendingApproval");
-  const rows = users.data?.items?.filter((x) => x.status === filter) || [];
-  async function action(id, type, body) {
-    setBusy(true);
-    try {
-      await api("/users/" + id + "/" + type, { method: "POST", body });
-      app.refresh();
-      app.toast("Đã cập nhật tài khoản.");
-      setReview(null);
-    } catch (e) {
-      setError(e.message);
-      app.toast(e.message);
-    } finally {
-      setBusy(false);
-    }
-  }
-  return (
-    <>
-      <Head level={2}
-        title="Tài khoản"
-        subtitle="Tài khoản chờ duyệt chưa được sử dụng nghiệp vụ."
-      >
-        {can(app.user, 20) && (
-          <Button primary onClick={() => setCreate(true)}>
-            <Plus />
-            Tạo tài khoản
-          </Button>
-        )}
-      </Head>
-      {create && (
-        <Editor
-          title="Tạo tài khoản"
-          kind="users"
-          initial={{ fullName: "", email: "", password: "" }}
-          fields={[
-            { key: "fullName", label: "Họ và tên", required: true },
-            { key: "email", label: "Email", type: "email", required: true },
-            {
-              key: "password",
-              label: "Mật khẩu khởi tạo (từ 12 ký tự)",
-              type: "password",
-              required: true,
-            },
-          ]}
-          onClose={() => setCreate(false)}
-        />
-      )}
-      <div className="tabs">
-        {["PendingApproval", "Active", "Suspended", "Rejected"].map((s) => (
-          <a
-            key={s}
-            href="#"
-            aria-current={filter === s ? "page" : undefined}
-            onClick={(e) => {
-              e.preventDefault();
-              setFilter(s);
-            }}
-          >
-            {statusNames[s][0]}
-          </a>
-        ))}
-      </div>
-      <State
-        {...users}
-        onRetry={users.reload}
-        empty={!users.loading && !rows.length}
-      >
-        <Table
-          rows={rows}
-          columns={[
-            { label: "Người đăng ký", render: nameCell },
-            { label: "Ngày đăng ký", render: (r) => fmtDate(r.createdAtUtc) },
-            { label: "Trạng thái", render: (r) => <Status value={r.status} /> },
-            {
-              label: "",
-              render: (r) =>
-                can(app.user, 15) && (
-                  <div className="row">
-                    {r.status === "PendingApproval" ? (
-                      <Button
-                        className="sm"
-                        onClick={() => {
-                          setReview(r);
-                          setRoleId(
-                            roles.data?.items.find((x) => !x.globalScope)?.id ||
-                              "",
-                          );
-                          setError("");
-                        }}
-                      >
-                        Xem xét
-                      </Button>
-                    ) : r.status === "Active" && r.id !== app.user.id ? (
-                      <Button
-                        className="sm danger"
-                        onClick={async () => {
-                          if (
-                            await app.ask({
-                              title: "Khóa tài khoản",
-                              message:
-                                r.fullName +
-                                " sẽ không thể sử dụng ứng dụng; các phiên sẽ bị thu hồi.",
-                              danger: true,
-                            })
-                          )
-                            action(r.id, "lock");
-                        }}
-                      >
-                        Khóa
-                      </Button>
-                    ) : null}
-                  </div>
-                ),
-            },
-          ]}
-        />
-      </State>
-      {review && (
-        <Modal title="Xem xét tài khoản" onClose={() => setReview(null)}>
-          <h3 style={{ marginTop: 16 }}>{review.fullName}</h3>
-          <p className="muted">{review.email}</p>
-          <div className="stack" style={{ marginTop: 20 }}>
-            <div className="field">
-              <label>Vai trò</label>
-              <Select
-                label="Chọn vai trò"
-                value={roleId}
-                onChange={setRoleId}
-                options={(roles.data?.items || []).map((r) => ({
-                  value: r.id,
-                  label: r.name,
-                }))}
-              />
-            </div>
-            <div className="field">
-              <label>Gắn hồ sơ giáo lý viên</label>
-              <Select
-                label="Chọn giáo lý viên"
-                value={catechistId}
-                onChange={setCatechistId}
-                options={[
-                  { value: "", label: "Không liên kết" },
-                  ...(catechists.data?.items || [])
-                    .filter((c) => !c.userId)
-                    .map((c) => ({ value: c.id, label: displayPerson(c) })),
-                ]}
-              />
-            </div>
-          </div>
-          {error && <p className="form-error">{error}</p>}
-          <div className="modal-actions">
-            <Button disabled={busy} onClick={() => action(review.id, "reject")}>
-              Từ chối
-            </Button>
-            <Button
-              primary
-              disabled={busy || !roleId}
-              onClick={() =>
-                action(review.id, "approve", {
-                  roleId,
-                  catechistId: catechistId || null,
-                })
-              }
-            >
-              Duyệt tài khoản
-            </Button>
-          </div>
-        </Modal>
-      )}
-    </>
-  );
-}
-function Roles() {
-  const app = useApp(),
-    data = useData("/catalog/roles");
-  const [id, setId] = useState(""),
-    [name, setName] = useState(""),
-    [mask, setMask] = useState(0n),
-    [global, setGlobal] = useState(false),
-    [busy, setBusy] = useState(false);
-  function choose(value) {
-    setId(value);
-    let role = data.data?.items.find((r) => r.id === value);
-    setName(role?.name || "");
-    setMask(BigInt(role?.permissions || 0));
-    setGlobal(!!role?.globalScope);
-  }
-  async function save() {
-    setBusy(true);
-    try {
-      await api("/catalog/roles" + (id ? "/" + id : ""), {
-        method: id ? "PUT" : "POST",
-        body: { name, permissions: mask.toString(), globalScope: global },
-      });
-      app.refresh();
-      app.toast("Đã lưu vai trò.");
-    } catch (e) {
-      app.toast(e.message);
-    } finally {
-      setBusy(false);
-    }
-  }
-  return (
-    <>
-      <Head level={2}
-        title="Phân quyền chức năng"
-        subtitle="Quyền chức năng và phạm vi lớp đều được kiểm tra tại API."
-      >
-        <Button onClick={() => choose("")}>
-          <Plus />
-          Vai trò mới
-        </Button>
-      </Head>
-      <State {...data} onRetry={data.reload}>
-        <div className="card">
-          <div className="formgrid">
-            <div className="field">
-              <label>Vai trò</label>
-              <Select
-                label="Chọn vai trò"
-                value={id}
-                onChange={choose}
-                options={(data.data?.items || []).map((r) => ({
-                  value: r.id,
-                  label: r.name,
-                }))}
-              />
-            </div>
-            <div className="field">
-              <label htmlFor="role-name">Tên vai trò</label>
-              <input
-                id="role-name"
-                className="input"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                disabled={name === "Admin"}
-              />
-            </div>
-          </div>
-          <label className="row" style={{ marginTop: 20 }}>
-            <input
-              className="check"
-              type="checkbox"
-              checked={global}
-              onChange={(e) => setGlobal(e.target.checked)}
-              disabled={name === "Admin"}
-            />
-            Phạm vi toàn đơn vị (bỏ chọn: chỉ lớp đang phụ trách)
-          </label>
-          <div className="permission-grid">
-            {data.data?.permissions.map((p) => (
-              <label className="row" key={p.name}>
-                <input
-                  className="check"
-                  type="checkbox"
-                  disabled={name === "Admin"}
-                  checked={(mask & BigInt(p.value)) !== 0n}
-                  onChange={(e) =>
-                    setMask(
-                      e.target.checked
-                        ? mask | BigInt(p.value)
-                        : mask & ~BigInt(p.value),
-                    )
-                  }
-                />
-                {permissionLabels[p.name] || p.name}
-              </label>
-            ))}
-          </div>
-          <div className="modal-actions">
-            <Button
-              primary
-              disabled={busy || !name.trim() || name === "Admin"}
-              onClick={save}
-            >
-              {busy ? "Đang lưu…" : "Lưu quyền"}
-            </Button>
-          </div>
-        </div>
-      </State>
-    </>
-  );
-}
+const Scan=React.lazy(()=>import("./ScanScreen").then(m=>({default:m.Scan})));
+const CatalogPage=React.lazy(()=>import("./CatalogScreens").then(m=>({default:m.CatalogPage})));
+const CredentialCard=React.lazy(()=>import("./CatalogScreens").then(m=>({default:m.CredentialCard})));
+const Assignments=React.lazy(()=>import("./CatalogScreens").then(m=>({default:m.Assignments})));
+const SessionScheduleEditor=React.lazy(()=>import("./ScheduleScreen").then(m=>({default:m.SessionScheduleEditor})));
+const Schedule=React.lazy(()=>import("./ScheduleScreen").then(m=>({default:m.Schedule})));
+const Report=React.lazy(()=>import("./ReportScreen").then(m=>({default:m.Report})));
+const AccountProfileEditor=React.lazy(()=>import("./AdminScreens").then(m=>({default:m.AccountProfileEditor})));
+const Users=React.lazy(()=>import("./AdminScreens").then(m=>({default:m.Users})));
+const Roles=React.lazy(()=>import("./AdminScreens").then(m=>({default:m.Roles})));
 function Question({ question, onAnswer }) {
   const [answer, setAnswer] = useState("");
   return (
@@ -2022,15 +606,9 @@ function Question({ question, onAnswer }) {
     </Modal>
   );
 }
-function AdminConsole({initial}) {
- const {user}=useApp();const tabs=[can(user,14)&&["users","Tài khoản"],can(user,16)&&["roles","Vai trò & phân quyền"],(can(user,28)||can(user,29))&&["settings","Thông tin web"]].filter(Boolean);const [tab,setTab]=useState(initial||tabs[0]?.[0]);
- return <><Head title="Admin Console"/><nav className="row wrap" aria-label="Admin Console">{tabs.map(([id,label])=><Button key={id} primary={id===tab} aria-current={id===tab?"page":undefined} onClick={()=>setTab(id)}>{label}</Button>)}</nav>{tab==="users"?<Users/>:tab==="roles"?<Roles/>:<WebSettingsEditor/>}</>;
-}
-function WebSettingsEditor(){const app=useApp(),[state,setState]=useState(null),[name,setName]=useState(""),[logo,setLogo]=useState(null),[remove,setRemove]=useState(false),[error,setError]=useState(""),[busy,setBusy]=useState(false);async function load(){try{const s=await api("/web-settings/admin");setState(s);setName(s.name);setLogo(null);setRemove(false);}catch(e){setError(e.message);}}useEffect(()=>{load();},[]);
- async function file(f){if(!f)return;try{if(!["image/png","image/jpeg","image/webp"].includes(f.type)||f.size>2000000)throw new Error("Chọn PNG/JPEG/WebP tối đa 2 MB.");const bitmap=await createImageBitmap(f);if(bitmap.width>2048||bitmap.height>2048){bitmap.close();throw new Error("Logo tối đa 2048×2048 pixel.");}const canvas=document.createElement("canvas");canvas.width=bitmap.width;canvas.height=bitmap.height;canvas.getContext("2d").drawImage(bitmap,0,0);bitmap.close();setLogo(canvas.toDataURL("image/png"));setRemove(false);setError("");}catch(e){setError(e.message);}}
- async function save(e){e.preventDefault();setBusy(true);setError("");try{const s=await api("/web-settings",{method:"PUT",body:{name,version:state.version,logoBase64:logo?.split(",")[1]||null,removeLogo:remove}});setState(s);setLogo(null);setRemove(false);window.dispatchEvent(new Event("branding-updated"));app.toast("Đã lưu thông tin web.");}catch(e){setError(e.message);}finally{setBusy(false);}}
- return <section className="card" style={{marginTop:20}}><h2>Thông tin web</h2>{error&&<p className="form-error" role="alert">{error}</p>}{state&&<form onSubmit={save} className="stack"><label className="field">Tên web<input className="input" required maxLength={100} value={name} disabled={!can(app.user,29)} onChange={e=>setName(e.target.value)}/></label><label className="field">Logo<input type="file" accept="image/png,image/jpeg,image/webp" disabled={!can(app.user,29)} onChange={e=>file(e.target.files[0])}/></label><div className="row">{!remove&&(logo||state.logoUrl)&&<img src={logo||state.logoUrl} alt="Logo xem trước" style={{width:64,height:64,objectFit:"contain"}}/>}<strong>{name}</strong></div>{can(app.user,29)&&<><Button onClick={()=>{setRemove(true);setLogo(null);}}>Xóa logo tùy chỉnh</Button><div className="modal-actions"><Button disabled={busy} onClick={load}>Hủy thay đổi</Button><Button primary type="submit" disabled={busy}>Lưu thông tin web</Button></div></>}</form>}</section>;
-}
+const AdminConsole=React.lazy(()=>import("./AdminScreens").then(m=>({default:m.AdminConsole})));
+const ReleaseVersion=React.lazy(()=>import("./AdminScreens").then(m=>({default:m.ReleaseVersion})));
+const WebSettingsEditor=React.lazy(()=>import("./AdminScreens").then(m=>({default:m.WebSettingsEditor})));
 function PasswordEditor({onClose,onChanged}) {
   const [currentPassword,setCurrent]=useState(""),[newPassword,setNew]=useState(""),[confirmPassword,setConfirm]=useState(""),[busy,setBusy]=useState(false),[error,setError]=useState("");
   async function submit(e){e.preventDefault();setError("");if(newPassword!==confirmPassword){setError("Xác nhận mật khẩu mới không khớp.");return;}setBusy(true);try{await api("/auth/change-password",{method:"POST",body:{currentPassword,newPassword,confirmPassword}});onChanged();}catch(e){setError(e.message);}finally{setBusy(false);}}
@@ -2086,8 +664,7 @@ function App() {
             setYears(d.items);
             setYearId(v=>{
               if(v&&d.items.some(y=>y.id===v))return v;
-              for(const kind of route==="quet-glv"?["glv","hs"]:["hs","glv"]){try{const key="ci-class-"+user.id+"-"+kind;const raw=document.cookie.split("; ").find(x=>x.startsWith(key+"="));if(raw){const pref=JSON.parse(decodeURIComponent(raw.slice(key.length+1)));if(pref.v===1&&d.items.some(y=>y.id===pref.year&&y.startDate<=today()&&y.endDate>=today()))return pref.year;}}catch{}}
-              return d.items.find(y=>y.isActive&&y.startDate<=today()&&y.endDate>=today())?.id||[...d.items].filter(y=>y.startDate<=today()&&y.endDate>=today()).sort((a,b)=>b.startDate.localeCompare(a.startDate))[0]?.id||"";
+              const valid=d.items.filter(y=>y.startDate<=today()&&y.endDate>=today());return valid.length===1?valid[0].id:"";
             });
           }
         })
@@ -2152,17 +729,9 @@ function App() {
     <>
       <Brand />
       <nav>
-        {visibleNav.map(([key, label, Icon]) => (
-          <a
-            href={"#" + key}
-            key={key}
-            className="navitem"
-            aria-current={route === key ? "page" : undefined}
-          >
-            <Icon />
-            <span>{label}</span>
-          </a>
-        ))}
+        {visibleNav.filter(n=>!["quet","quet-glv","baocao","baocao-gio"].includes(n[0])).map(([key,label,Icon])=><a href={"#"+key} key={key} className="navitem" aria-current={route===key?"page":undefined}><Icon/><span>{label}</span></a>)}
+        {[["Điểm danh",["quet","quet-glv"]],["Báo cáo",["baocao","baocao-gio"]]].map(([label,keys])=>visibleNav.some(n=>keys.includes(n[0]))&&<details key={label} open><summary className="navitem">{label}</summary>{visibleNav.filter(n=>keys.includes(n[0])).map(([key,name,Icon])=><a style={{paddingLeft:30}} className="navitem" key={key} href={"#"+key} aria-current={route===key?"page":undefined}><Icon/><span>{name}</span></a>)}</details>)}
+
       </nav>
       <div className="profile">
         <div className="user-mark">
@@ -2181,7 +750,7 @@ function App() {
       </div>
     </>
   );
-  let allowed = route==="khac" || visibleNav.some((n) => n[0] === route) || (route==="duyet"&&can(user,14)) || (route==="quyen"&&can(user,16));
+  let allowed = route==="diemdanh" || route==="khac" || visibleNav.some((n) => n[0] === route) || (route==="duyet"&&can(user,14)) || (route==="quyen"&&can(user,16));
   return (
     <Context.Provider value={value}>
       {passwordOpen&&<PasswordEditor onClose={()=>setPasswordOpen(false)} onChanged={()=>{setPasswordOpen(false);clearToken();setUser(null);setClasses([]);setYears([]);setYearId("");setClassId("");setSessionChoice("");setPasswordNotice("Đổi mật khẩu thành công. Vui lòng đăng nhập lại bằng mật khẩu mới.");}}/>}
@@ -2207,31 +776,32 @@ function App() {
                 setClassId("");
               }}
             />
+            {!yearId&&<span role="status" className="small muted">{years.filter(y=>y.startDate<=today()&&y.endDate>=today()).length>1?"Có nhiều năm học trùng ngày hiện tại. Hãy chọn năm.":"Chưa có năm học phù hợp hôm nay. Hãy chọn năm."}</span>}
             <span className="spacer" />
             <span className="small muted smallhide">{fmtDate(today())}</span>
           </header>
-          <div className="content">
+          <div className="content"><RouteBoundary key={route}><React.Suspense fallback={<p role="status">Đang tải màn hình…</p>}>
             {!allowed ? (
               <div className="empty muted">
                 Bạn chưa có quyền truy cập màn này.
               </div>
-            ) : route === "khac" ? (<><Head title="Chức năng khác"/><div className="stack">{visibleNav.filter(n=>!["tongquan","quet","quet-glv","lich"].includes(n[0])).map(([key,label,Icon])=><Button key={key} onClick={()=>go(key)}><Icon/>{label}</Button>)}<Button onClick={()=>setPasswordOpen(true)}>Đổi mật khẩu</Button><Button onClick={logout}>Đăng xuất</Button></div></>) : route === "tongquan" ? (
-              <Dashboard />
+            ) : route === "diemdanh" ? (<><Head title="Điểm danh"/><div className="dashboard-actions">{visibleNav.filter(n=>["quet","quet-glv"].includes(n[0])).map(([key,label,Icon])=><Button key={key} onClick={()=>go(key)}><Icon/>{label}</Button>)}</div></>) : route === "khac" ? (<><Head title="Chức năng khác"/><div className="stack">{visibleNav.filter(n=>!["tongquan","quet","quet-glv","lich"].includes(n[0])).map(([key,label,Icon])=><Button key={key} onClick={()=>go(key)}><Icon/>{label}</Button>)}<Button onClick={()=>setPasswordOpen(true)}>Đổi mật khẩu</Button><Button onClick={logout}>Đăng xuất</Button></div></>) : route === "tongquan" ? (
+              <React.Suspense fallback={<p>Đang tải tổng quan…</p>}><DashboardPage app={value}/></React.Suspense>
             ) : ["quet","quet-glv"].includes(route) ? (
               <Scan key={route} teacher={route==="quet-glv"}/>
             ) : ["lop", "hocsinh", "glv", "namhoc"].includes(route) ? (
               <CatalogPage key={route} type={route} />
             ) : route === "lich" ? (
               <Schedule />
-            ) : route === "baocao" ? (
+            ) : route === "baocao-gio" ? (<React.Suspense fallback={<p>Đang tải báo cáo…</p>}><TimingReport app={value}/></React.Suspense>) : route === "baocao" ? (
               <Report />
             ) : (
               <AdminConsole key={route} initial={route==="duyet"?"users":route==="quyen"?"roles":null} />
             )}
-          </div>
+          </React.Suspense></RouteBoundary></div>
         </main>
       </div>
-      <nav className="bottom-nav" aria-label="Điều hướng chính">{[["tongquan","Tổng quan",LayoutDashboard],["quet","Thiếu nhi",ScanLine],["quet-glv","GLV",UserRoundCheck],["lich","Lịch",CalendarDays],["khac","Khác",Menu]].filter(([key])=>key==="khac"||visibleNav.some(n=>n[0]===key)).map(([key,label,Icon])=><a key={key} href={"#"+key} aria-current={route===key?"page":undefined}><Icon size={20}/><span>{label}</span></a>)}</nav>
+      <nav className="bottom-nav" aria-label="Điều hướng chính">{[["tongquan","Tổng quan",LayoutDashboard],["diemdanh","Điểm danh",ScanLine],["lich","Lịch",CalendarDays],["baocao","Báo cáo",ChartNoAxesCombined],["khac","Khác",Menu]].filter(([key])=>key==="khac"||key==="diemdanh"||visibleNav.some(n=>n[0]===key)).map(([key,label,Icon])=><a key={key} href={"#"+key} aria-current={route===key?"page":undefined}><Icon size={20}/><span>{label}</span></a>)}</nav>
       {question && (
         <Question
           question={question}
@@ -2250,3 +820,5 @@ function App() {
   );
 }
 createRoot(document.getElementById("root")).render(<App />);
+
+export {useApp,useData,query,nameCell,rate,Status,statusNames,permissionLabels,Editor,previewDays};
