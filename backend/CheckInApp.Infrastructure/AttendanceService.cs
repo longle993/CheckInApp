@@ -186,8 +186,11 @@ public class AttendanceService(AppDbContext db, AccessService access, TimeProvid
             await access.Class(q.ActorId, q.ClassId.Value, ct);
             ids = [q.ClassId.Value];
         }
-        if (q.YearId != null)
-            ids = await db.Classes.Where(x => ids.Contains(x.Id) && x.AcademicYearId == q.YearId).Select(x => x.Id).ToListAsync(ct);
+        ids = await db.Classes
+            .Where(x => ids.Contains(x.Id))
+            .WhereIf(q.YearId != null, x => x.AcademicYearId == q.YearId)
+            .Select(x => x.Id)
+            .ToListAsync(ct);
         var now = clock.GetUtcNow().UtcDateTime;
         var revision = await db.Audit.LongCountAsync(ct);
         var cacheKey = $"report:{q.ActorId}:{q.ClassId}:{q.YearId}:{q.From}:{q.Until}:{revision}:{now:yyyyMMddHHmm}";

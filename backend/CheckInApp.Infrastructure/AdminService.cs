@@ -3,7 +3,7 @@ using CheckInApp.Domain;
 using Microsoft.EntityFrameworkCore;
 namespace CheckInApp.Infrastructure;
 
-public class AdminService(AppDbContext db, AccessService access, TimeProvider clock)
+public class AdminService(AppDbContext db, AccessService access, TimeProvider clock) : IAdminService
 {
     public async Task<object> CatechistCard(Guid actor, Guid id, CancellationToken ct)
     {

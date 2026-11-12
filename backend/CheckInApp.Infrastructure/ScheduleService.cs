@@ -3,18 +3,21 @@ using CheckInApp.Domain;
 using Microsoft.EntityFrameworkCore;
 namespace CheckInApp.Infrastructure;
 
-public class ScheduleService(AppDbContext db, TimeProvider clock)
+public class ScheduleService(AppDbContext db, TimeProvider clock, AccessService? access = null) : IScheduleService
 {
-    public async Task EditSession(Guid actor, Guid id, SessionScheduleInput input, AccessService access, CancellationToken ct)
+    public Task EditSession(Guid actor, Guid id, SessionScheduleInput input, CancellationToken ct) =>
+        EditSession(actor, id, input, access ?? throw new InvalidOperationException("AccessService is required for session edits."), ct);
+
+    public async Task EditSession(Guid actor, Guid id, SessionScheduleInput input, AccessService accessService, CancellationToken ct)
     {
-        await access.Require(actor, Permission.ScheduleManage, ct);
+        await accessService.Require(actor, Permission.ScheduleManage, ct);
         await using var tx = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, ct);
         await LockClass((await db.Sessions.AsNoTracking().SingleAsync(x => x.Id == id, ct)).ClassRoomId, ct);
         var query = db.Database.IsSqlServer()
             ? db.Sessions.FromSqlInterpolated($"SELECT * FROM [Sessions] WITH (UPDLOCK, ROWLOCK) WHERE [Id] = {id}")
             : db.Sessions.Where(x => x.Id == id);
         var session = await query.SingleOrDefaultAsync(ct) ?? throw new AppException(404, "NOT_FOUND", "Không có buổi học.");
-        await access.Class(actor, session.ClassRoomId, ct);
+        await accessService.Class(actor, session.ClassRoomId, ct);
         var originalStart = session.OpensAtUtc;
         var targetDate = input.Date ?? session.Date;
         var year = await (from c in db.Classes
@@ -222,11 +225,3 @@ public class ScheduleService(AppDbContext db, TimeProvider clock)
             await own.CommitAsync(ct);
     }
 }
-public record SessionScheduleInput(
-    TimeOnly OpensAt,
-    TimeOnly ClosesAt,
-    bool StudentAttendanceEnabled,
-    bool CatechistAttendanceEnabled,
-    Guid Version,
-    string Reason,
-    DateOnly? Date = null);

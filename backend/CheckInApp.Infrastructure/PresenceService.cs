@@ -4,8 +4,7 @@ using CheckInApp.Domain;
 using Microsoft.EntityFrameworkCore;
 namespace CheckInApp.Infrastructure;
 
-public record PresenceInput(DateTime CheckedInAtUtc, DateTime? CheckedOutAtUtc, Guid? Version, string Reason);
-public class PresenceService(AppDbContext db, AccessService access, TimeProvider clock)
+public class PresenceService(AppDbContext db, AccessService access, TimeProvider clock) : IPresenceService
 {
     public async Task<object> List(Guid actor, Guid sessionId, CancellationToken ct)
     {

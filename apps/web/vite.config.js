@@ -15,6 +15,7 @@ export default defineConfig({
   server: {
     port: 5173,
     strictPort: true,
+    allowedHosts: ["longle993.io.vn"],
     proxy: {
       "/api": {
         target: process.env.API_URL || "http://127.0.0.1:5080",

@@ -1,10 +1,7 @@
-using System.Security.Claims;
 using System.Text.Json;
-using CheckInApp.Api;
 using CheckInApp.Application;
 using CheckInApp.Domain;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
+using CheckInApp.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 namespace CheckInApp.Tests;
@@ -36,8 +33,8 @@ public class CalendarTests
                 RecordedAtUtc = entered == int.MinValue ? DateTime.MinValue : now.AddMinutes(entered.Value)
             });
         await f.Db.SaveChangesAsync();
-        var controller = new AttendanceCalendarController(f.Db, f.Access, f.Clock) { ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", f.User.ToString())], "test")) } } };
-        var result = JsonSerializer.SerializeToElement(await controller.Get((await f.Db.Years.SingleAsync()).Id, "students", f.Student, 2026, 10, null, default));
+        var service = new ReportingService(f.Db, f.Access, f.Clock);
+        var result = JsonSerializer.SerializeToElement(await service.AttendanceCalendar(f.User, (await f.Db.Years.SingleAsync()).Id, "students", f.Student, 2026, 10, null, default));
         Assert.Equal(expected, result.GetProperty("items")[0].GetProperty("status").GetString());
     }
     [Fact]
@@ -45,8 +42,8 @@ public class CalendarTests
     {
         await using var f = new Fixture();
         await f.Init();
-        var controller = new AttendanceCalendarController(f.Db, f.Access, f.Clock) { ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", f.User.ToString())], "test")) } } };
-        var e = await Assert.ThrowsAsync<AppException>(() => controller.Get((f.Db.Years.Single()).Id, "students", Guid.NewGuid(), 2026, 10, null, default));
+        var service = new ReportingService(f.Db, f.Access, f.Clock);
+        var e = await Assert.ThrowsAsync<AppException>(() => service.AttendanceCalendar(f.User, (f.Db.Years.Single()).Id, "students", Guid.NewGuid(), 2026, 10, null, default));
         Assert.Equal(403, e.Status);
     }
     [Fact]
@@ -80,8 +77,8 @@ public class CalendarTests
             RecordedAtUtc = now.Date.AddHours(2)
         });
         await f.Db.SaveChangesAsync();
-        var controller = new AttendanceCalendarController(f.Db, f.Access, f.Clock) { ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", f.User.ToString())], "test")) } } };
-        var result = JsonSerializer.SerializeToElement(await controller.Get((await f.Db.Years.SingleAsync()).Id, "students", f.Student, 2026, 10, null, default));
+        var service = new ReportingService(f.Db, f.Access, f.Clock);
+        var result = JsonSerializer.SerializeToElement(await service.AttendanceCalendar(f.User, (await f.Db.Years.SingleAsync()).Id, "students", f.Student, 2026, 10, null, default));
         Assert.Equal(
             new[] { "late", "ontime", "future" },
             result.GetProperty("items").EnumerateArray().Select(x => x.GetProperty("status").GetString()).ToArray());

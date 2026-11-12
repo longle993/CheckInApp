@@ -1,17 +1,13 @@
-using System.Security.Claims;
-using CheckInApp.Api;
 using CheckInApp.Application;
 using CheckInApp.Domain;
 using CheckInApp.Infrastructure;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 namespace CheckInApp.Tests;
 
 public class RefinementTests
 {
-    static AccountManagementController Controller(Fixture f) => new(f.Db, f.Access) { ControllerContext = new() { HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", f.User.ToString())], "test")) } } };
+    static AccountService Service(Fixture f) => new(f.Db, f.Access);
     [Fact]
     public async Task AdminCanLinkTeacherWithoutRoleChange()
     {
@@ -21,7 +17,8 @@ public class RefinementTests
         f.Db.Catechists.Add(teacher);
         await f.Db.SaveChangesAsync();
         var u = await f.Db.Users.SingleAsync(x => x.Id == f.User);
-        await Controller(f).Edit(
+        await Service(f).Edit(
+            f.User,
             u.Id,
             new(
             u.FullName,
@@ -42,7 +39,8 @@ public class RefinementTests
         await f.Init();
         var teacher = await f.Db.Catechists.SingleAsync();
         var u = await f.Db.Users.SingleAsync(x => x.Id == f.User);
-        var e = await Assert.ThrowsAsync<AppException>(() => Controller(f).Edit(
+        var e = await Assert.ThrowsAsync<AppException>(() => Service(f).Edit(
+            f.User,
             u.Id,
             new(
             u.FullName,

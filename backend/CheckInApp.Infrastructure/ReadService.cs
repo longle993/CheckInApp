@@ -3,7 +3,7 @@ using CheckInApp.Domain;
 using Microsoft.EntityFrameworkCore;
 namespace CheckInApp.Infrastructure;
 
-public class ReadService(AppDbContext db, AccessService access, TimeProvider clock)
+public class ReadService(AppDbContext db, AccessService access, TimeProvider clock) : IReadService
 {
     public static string[] SearchTerms(string? value)
     {
@@ -55,8 +55,11 @@ public class ReadService(AppDbContext db, AccessService access, TimeProvider clo
                 throw new AppException(403, "CLASS_SCOPE", "Bạn không phụ trách lớp này.");
             ids = [classId.Value];
         }
-        if (yearId != null)
-            ids = await db.Classes.Where(x => ids.Contains(x.Id) && x.AcademicYearId == yearId).Select(x => x.Id).ToListAsync(ct);
+        ids = await db.Classes
+            .Where(x => ids.Contains(x.Id))
+            .WhereIf(yearId != null, x => x.AcademicYearId == yearId)
+            .Select(x => x.Id)
+            .ToListAsync(ct);
         page = Math.Max(1, page);
         pageSize = Math.Clamp(pageSize, 1, 1000);
         var skip = (page - 1) * pageSize;
@@ -71,9 +74,9 @@ public class ReadService(AppDbContext db, AccessService access, TimeProvider clo
                 };
             case "classes":
                 Require(Permission.ClassView);
-                var cls = db.Classes.AsNoTracking().Where(x => ids.Contains(x.Id));
-                if (yearId != null)
-                    cls = cls.Where(x => x.AcademicYearId == yearId);
+                var cls = db.Classes.AsNoTracking()
+                    .Where(x => ids.Contains(x.Id))
+                    .WhereIf(yearId != null, x => x.AcademicYearId == yearId);
                 foreach (var term in terms)
                     cls = cls.Where(x => x.Name.Contains(term) || x.Code.Contains(term));
                 return new
@@ -114,9 +117,8 @@ public class ReadService(AppDbContext db, AccessService access, TimeProvider clo
                 };
             case "catechists":
                 Require(Permission.CatechistView);
-                var cas = rights.Global
-                    ? db.Catechists.AsNoTracking()
-                    : db.Catechists.AsNoTracking().Where(c => db.Assignments.Any(a => a.CatechistId == c.Id && ids.Contains(a.ClassRoomId)));
+                var cas = db.Catechists.AsNoTracking()
+                    .WhereIf(!rights.Global, c => db.Assignments.Any(a => a.CatechistId == c.Id && ids.Contains(a.ClassRoomId)));
                 foreach (var term in terms)
                     cas = cas.Where(x => x.FullName.Contains(term) || (x.SaintName != null && x.SaintName.Contains(term)));
                 var totalTeachers = await cas.CountAsync(ct);
@@ -195,8 +197,11 @@ public class ReadService(AppDbContext db, AccessService access, TimeProvider clo
             await access.Class(actor, classId.Value, ct);
             ids = [classId.Value];
         }
-        if (yearId != null)
-            ids = await db.Classes.Where(x => ids.Contains(x.Id) && x.AcademicYearId == yearId).Select(x => x.Id).ToListAsync(ct);
+        ids = await db.Classes
+            .Where(x => ids.Contains(x.Id))
+            .WhereIf(yearId != null, x => x.AcademicYearId == yearId)
+            .Select(x => x.Id)
+            .ToListAsync(ct);
         var now = clock.GetUtcNow().UtcDateTime;
         var rows = await (from s in db.Sessions.AsNoTracking()
                           join c in db.Classes on s.ClassRoomId equals c.Id

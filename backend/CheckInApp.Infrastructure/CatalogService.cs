@@ -278,13 +278,15 @@ public class CatalogService(AppDbContext db, AccessService access, ScheduleServi
                     : null;
                 await schedules.LockClass(eid, ct);
                 var exists = await db.Sessions.Where(x => x.ClassRoomId == eid
-                    && (x.SourceDate ?? x.Date) == edate
-                    && (exceptionScheduleId == null || x.ScheduleId == exceptionScheduleId))
+                    && (x.SourceDate ?? x.Date) == edate)
+                    .WhereIf(exceptionScheduleId != null, x => x.ScheduleId == exceptionScheduleId)
                     .OrderBy(x => x.OpensAtUtc)
                     .FirstOrDefaultAsync(ct);
                 if (edate < today || (exists != null && exists.OpensAtUtc <= clock.GetUtcNow().UtcDateTime))
                     throw Invalid("Không thay ngoại lệ cho buổi đã bắt đầu hoặc quá khứ.");
-                var sch = await db.Schedules.Where(x => x.ClassRoomId == eid && (exceptionScheduleId == null || x.Id == exceptionScheduleId)).OrderBy(x => x.OpensAt)
+                var sch = await db.Schedules.Where(x => x.ClassRoomId == eid)
+                    .WhereIf(exceptionScheduleId != null, x => x.Id == exceptionScheduleId)
+                    .OrderBy(x => x.OpensAt)
                     .FirstOrDefaultAsync(ct) ?? throw Invalid("Cần cấu hình lịch trước.");
                 if (edate < sch.From || edate > sch.Until)
                     throw Invalid("Ngày ngoại lệ ngoài khoảng lịch.");

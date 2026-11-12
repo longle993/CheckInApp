@@ -6,9 +6,7 @@ using CheckInApp.Domain;
 using Microsoft.EntityFrameworkCore;
 namespace CheckInApp.Infrastructure;
 
-public record DeleteSelection(string Kind, Guid[] Ids, string? Fingerprint = null);
-public record DeletePreview(string Fingerprint, Dictionary<string, int> Counts, string[] Names);
-public class BulkDeleteService(AppDbContext db, AccessService access, ScheduleService schedules)
+public class BulkDeleteService(AppDbContext db, AccessService access, ScheduleService schedules) : IBulkDeleteService
 {
     public async Task<DeletePreview> Run(Guid actor, DeleteSelection input, bool execute, CancellationToken ct = default)
     {

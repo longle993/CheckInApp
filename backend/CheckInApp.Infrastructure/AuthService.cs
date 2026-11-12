@@ -10,9 +10,15 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 namespace CheckInApp.Infrastructure;
 
-public record TokenPair(string AccessToken, string RefreshToken, DateTime ExpiresAtUtc, object User);
-public class AuthService(AppDbContext db, IConfiguration config, AccessService access, TimeProvider clock)
+public class AuthService(AppDbContext db, IConfiguration config, AccessService access, TimeProvider clock) : IAuthService
 {
+    public async Task Logout(Guid sessionId, CancellationToken ct)
+    {
+        var session = await db.AuthSessions.SingleAsync(x => x.Id == sessionId, ct);
+        session.Revoked = true;
+        session.Version = Guid.NewGuid();
+        await db.SaveChangesAsync(ct);
+    }
     public async Task ChangePassword(Guid actor, string currentPassword, string newPassword, string confirmation, CancellationToken ct)
     {
         if (string.IsNullOrEmpty(currentPassword) || currentPassword.Length > 128)
