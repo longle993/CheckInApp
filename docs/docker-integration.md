@@ -1,3 +1,5 @@
+> Tài liệu vận hành/kiểm thử theo thời điểm ghi nhận. Xem [đặc tả hợp nhất 01/11/2026](requirements-2026-11-01.md) để phân biệt chức năng hiện có và yêu cầu đang chờ triển khai; không coi IP/phiên bản APK hoặc cổng trong ảnh/chỉ dẫn cũ là trạng thái hiện tại đã kiểm tra.
+
 # SQL Server và Redis: kiểm thử tích hợp
 
 Đã chạy thực tế ngày 27/10/2026 trên Docker Desktop Linux containers, SQL Server 2022 Developer **16.0.4305.5**, Redis **7.4.12** và API .NET 10.

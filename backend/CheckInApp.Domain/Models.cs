@@ -9,7 +9,9 @@ public enum Permission : long
     AttendanceCorrect = 1L << 12, ReportView = 1L << 13, UserView = 1L << 14, UserApprove = 1L << 15,
     RoleManage = 1L << 16, CredentialManage = 1L << 17, AssignmentManage = 1L << 18, AuditView = 1L << 19, UserCreate = 1L << 20,
     StudentImport = 1L << 21, StudentExport = 1L << 22, CatechistImport = 1L << 23, CatechistExport = 1L << 24,
-    ClassImport = 1L << 25, ClassExport = 1L << 26, CatechistAttendance = 1L << 27
+    ClassImport = 1L << 25, ClassExport = 1L << 26, CatechistAttendance = 1L << 27,
+    WebSettingsView = 1L << 28, WebSettingsManage = 1L << 29, UserManage = 1L << 30,
+    ClassDelete = 1L << 31, StudentDelete = 1L << 32, CatechistDelete = 1L << 33, YearDelete = 1L << 34, YearImport = 1L << 35, YearExport = 1L << 36
 }
 public enum AccountStatus
 {
@@ -139,6 +141,14 @@ public class AttendanceSchedule : Entity
 }
 public class ScheduleException : Entity
 {
+    public Guid? ScheduleId
+    {
+        get; set;
+    }
+    public DateOnly? MovedToDate
+    {
+        get; set;
+    }
     public bool StudentAttendanceEnabled { get; set; } = true;
     public bool CatechistAttendanceEnabled { get; set; } = true;
     public Guid ClassRoomId
@@ -165,6 +175,14 @@ public class ScheduleException : Entity
 }
 public class AttendanceSession : Entity
 {
+    public Guid? ScheduleId
+    {
+        get; set;
+    }
+    public DateOnly? SourceDate
+    {
+        get; set;
+    }
     public bool StudentAttendanceEnabled { get; set; } = true;
     public bool CatechistAttendanceEnabled { get; set; } = true;
     public Guid ClassRoomId
@@ -225,14 +243,26 @@ public class StudentCredential : Entity
 }
 public class CatechistCredential : Entity
 {
-    public Guid CatechistId { get; set; }
+    public Guid CatechistId
+    {
+        get; set;
+    }
     public string TokenHash { get; set; } = "";
-    public DateTime IssuedAtUtc { get; set; }
-    public DateTime? RevokedAtUtc { get; set; }
+    public DateTime IssuedAtUtc
+    {
+        get; set;
+    }
+    public DateTime? RevokedAtUtc
+    {
+        get; set;
+    }
 }
 public class AttendanceRecord : Entity
 {
-    public DateTime? CheckedOutAtUtc { get; set; }
+    public DateTime? CheckedOutAtUtc
+    {
+        get; set;
+    }
     public Guid SessionId
     {
         get; set;
@@ -253,11 +283,26 @@ public class AttendanceRecord : Entity
 }
 public class CatechistAttendanceRecord : Entity
 {
-    public Guid SessionId { get; set; }
-    public Guid CatechistId { get; set; }
-    public DateTime CheckedInAtUtc { get; set; }
-    public DateTime? CheckedOutAtUtc { get; set; }
-    public Guid ActorId { get; set; }
+    public Guid SessionId
+    {
+        get; set;
+    }
+    public Guid CatechistId
+    {
+        get; set;
+    }
+    public DateTime CheckedInAtUtc
+    {
+        get; set;
+    }
+    public DateTime? CheckedOutAtUtc
+    {
+        get; set;
+    }
+    public Guid ActorId
+    {
+        get; set;
+    }
     public Guid Version { get; set; } = Guid.NewGuid();
 }
 public class IdempotencyRequest : Entity

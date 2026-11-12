@@ -1,10 +1,20 @@
 # CheckInApp
 
-Chạy bản web và APK mới nhất: [hướng dẫn chạy bản build 28/10/2026](docs/run-built-app.md).
+Đã triển khai web/API, kiểm thử QA: [chỉnh giao diện, xóa hàng loạt, lịch cha/con và widget Bảng điểm danh — 02/11/2026](docs/design-attendance-ui-2026-11-02.md). Xem [hướng dẫn, kiểm thử và giới hạn](docs/release-ui-2026-11-02.md) và [thuật toán tìm kiếm, tối ưu tải dữ liệu, số đo trước/sau](docs/search-performance-2026-11-02.md).
 
-Ứng dụng quản lý lớp giáo lý và điểm danh: web quản trị theo phương án **A**, mobile điểm danh theo phương án **C**. Giao diện tiếng Việt, Inter, nền sáng, màu nhấn chàm. Web gọi API thật; không dùng dữ liệu giả hardcode trong React.
+Thiết kế đang chờ triển khai: [đăng nhập web desktop/mobile ngày02/11/2026](docs/design-login-2026-11-02.md), theo ảnh tham khảo và nhận diện Xứ đoàn Thiên Thần Raphael.
 
-SQL Server và Redis Docker đã được kiểm thử thực tế. Bản web tích hợp: http://127.0.0.1:5174. Xem [hướng dẫn chạy và 39 kiểm tra tích hợp](docs/docker-integration.md).
+Bản hiện tại: [0.2.0 — hướng dẫn widget, báo cáo, avatar và in lô](docs/release-0.2.0.md).
+
+Đặc tả mở rộng đã triển khai bản0.2.0: [mở rộng tổng quan và chức năng ngày 01/11](docs/design-dashboard-expansion-2026-11-01.md).
+
+Đặc tả hợp nhất và yêu cầu mới: [nghiệp vụ + brief ngày 01/11/2026](docs/requirements-2026-11-01.md). Đã triển khai đợt 01/11; xem kết quả và giới hạn trong hướng dẫn mới.
+
+Chạy bản web và APK mới nhất: [hướng dẫn bản cập nhật 01/11/2026](docs/release-2026-11-01.md).
+
+Ứng dụng quản lý lớp giáo lý và điểm danh: web quản trị theo phương án **A**, mobile điểm danh theo phương án **C**. Giao diện tiếng Việt, Inter, nền sáng, màu đỏ đô, trắng và trắng be. Web gọi API thật; không dùng dữ liệu giả hardcode trong React.
+
+SQL Server và Redis Docker đã được kiểm thử thực tế. Script Start-WebBuild hiện phục vụ web tại http://127.0.0.1:5175 và trỏ API 5083; các lượt kiểm thử gần đây dùng web 5175 → API 5083. Cần chọn đúng cấu hình API khi khởi động. Xem [hướng dẫn chạy và 39 kiểm tra tích hợp](docs/docker-integration.md).
 
 APK cài thử qua Wi-Fi và thẻ quét mẫu: xem [cài Android và kiểm thử camera thực tế](docs/android-device-test.md).
 
@@ -57,7 +67,7 @@ npm start
 
 - Android Emulator mặc định gọi `http://10.0.2.2:5080/api/v1`.
 - Điện thoại thật: đặt `EXPO_PUBLIC_API_URL=http://<IP-LAN-máy-chủ>:5080/api/v1`, chạy API với `--urls http://0.0.0.0:5080` trong mạng thử nghiệm và cho phép cổng qua firewall khi cần. Không dùng `localhost` của máy tính trên điện thoại.
-- Môi trường phát hành phải dùng API HTTPS. Expo Go dùng cho thử nghiệm; cấu hình native cần quyền camera. Chưa có APK/IPA được ký hoặc bản phát hành lên cửa hàng.
+- Môi trường phát hành phải dùng API HTTPS. Expo Go dùng cho thử nghiệm; cấu hình native cần quyền camera. Đã có APK Android preview ký cục bộ; APK đó chưa chứa toàn bộ các cập nhật web/mobile về sau. Chưa có bản phát hành lên cửa hàng hoặc IPA được xác nhận.
 
 Đăng nhập, chọn buổi hôm nay, mở camera hoặc nhập mã thẻ. Mobile chỉ hiển thị thành công sau khi API commit. Mất mạng giữ request đang thử trong bộ nhớ để gửi lại cùng idempotency key; không có hàng đợi offline và không hứa đã lưu khi server chưa xác nhận.
 
@@ -155,5 +165,8 @@ Chi tiết kết quả và đối chiếu giao diện: [docs/verification.md](do
 - [Expo Camera](https://docs.expo.dev/versions/latest/sdk/camera/)
 
 Token màu/font của web nằm trong `apps/web/src/styles.css` và `production.css`; theme mobile nằm trong `apps/mobile/App.js`. Các lớp/học sinh được tạo trong Development là dữ liệu giả.
-#   C h e c k I n A p p  
- 
+# CheckInApp
+
+
+
+Điều chỉnh UI, nhóm quyền và tối ưu báo cáo 05/11/2026: [tài liệu và kiểm thử](docs/ui-refinement-2026-11-05.md).

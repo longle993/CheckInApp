@@ -9,7 +9,7 @@ if [ ! -d node_modules ] || [ ! -f .installed-lock-hash ] || [ "$(cat .installed
   npm ci --no-audit --no-fund
   printf '%s' "$lock_hash" > .installed-lock-hash
 fi
-cp /source/App.js /source/index.js /source/app.json /source/app.config.js /work/
+cp /source/*.js /source/app.json /work/
 cp -R /source/plugins /work/
 if [ -d /source/assets ]; then cp -R /source/assets /work/; fi
 npx expo prebuild --platform android --no-install

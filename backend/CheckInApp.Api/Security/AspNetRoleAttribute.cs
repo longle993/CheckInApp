@@ -14,7 +14,11 @@ public sealed class AspNetRoleAttribute : AuthorizeAttribute
 public record PermissionRequirement(Permission Permission) : IAuthorizationRequirement;
 public sealed class PermissionPolicyProvider(IOptions<AuthorizationOptions> options) : DefaultAuthorizationPolicyProvider(options)
 {
-    public override Task<AuthorizationPolicy?> GetPolicyAsync(string name) => name.StartsWith(AspNetRoleAttribute.Prefix) && long.TryParse(name[AspNetRoleAttribute.Prefix.Length..], out var mask) ? Task.FromResult<AuthorizationPolicy?>(new AuthorizationPolicyBuilder().RequireAuthenticatedUser().AddRequirements(new PermissionRequirement((Permission)mask)).Build()) : base.GetPolicyAsync(name);
+    public override Task<AuthorizationPolicy?> GetPolicyAsync(string name) => name.StartsWith(AspNetRoleAttribute.Prefix)
+        && long.TryParse(name[AspNetRoleAttribute.Prefix.Length..], out var mask)
+        ? Task.FromResult<AuthorizationPolicy?>(new AuthorizationPolicyBuilder().RequireAuthenticatedUser().AddRequirements(new PermissionRequirement((Permission)mask))
+        .Build())
+        : base.GetPolicyAsync(name);
 }
 public sealed class PermissionHandler(AccessService access) : AuthorizationHandler<PermissionRequirement>
 {

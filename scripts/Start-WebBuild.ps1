@@ -1,6 +1,6 @@
-param([switch]$Rebuild)
+param([switch]$Rebuild, [string]$ApiUrl = "http://127.0.0.1:5083")
 $ErrorActionPreference = 'Stop'
-$env:API_URL = 'http://127.0.0.1:5082'
+$env:API_URL = $ApiUrl
 $webBuildRoot = Split-Path $PSScriptRoot -Parent
 Push-Location $webBuildRoot
 try {

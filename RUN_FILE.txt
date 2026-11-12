@@ -1,0 +1,7 @@
+Api, SQL Server & Redis:
+cd D:\LongLe\Code\CheckInApp
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Start-Integration.ps1
+
+Web:
+cd D:\LongLe\Code\CheckInApp
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Start-WebBuild.ps1

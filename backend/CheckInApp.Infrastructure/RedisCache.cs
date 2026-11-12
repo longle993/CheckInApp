@@ -33,7 +33,10 @@ public sealed class RedisCache(IConfiguration config) : IDisposable
         try
         {
             var c = await connection.Value;
-            await c.GetDatabase().StringSetAsync(key, JsonSerializer.Serialize(value, new JsonSerializerOptions(JsonSerializerDefaults.Web)), TimeSpan.FromSeconds(30));
+            await c.GetDatabase().StringSetAsync(
+                key,
+                JsonSerializer.Serialize(value, new JsonSerializerOptions(JsonSerializerDefaults.Web)),
+                TimeSpan.FromSeconds(30));
         }
         catch (RedisException) {/* SQL remains authoritative; cache failure must not lose attendance. */}
     }

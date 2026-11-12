@@ -13,7 +13,8 @@ public static class Bootstrap
         if (await db.Users.AnyAsync(ct))
         {
             var existingAdmin = await db.Roles.SingleOrDefaultAsync(x => x.Name == "Admin", ct);
-            if (existingAdmin != null) existingAdmin.Permissions = CatalogService.AllPermissions;
+            if (existingAdmin != null)
+                existingAdmin.Permissions = CatalogService.AllPermissions;
             await db.SaveChangesAsync(ct);
             return;
         }
@@ -97,31 +98,31 @@ public static class Bootstrap
                 await generator.Synchronize(id, ct);
             // Explicit development-only extra sessions allow camera testing on a weekday as well.
             if (config.GetValue<bool>("SeedDemoData"))
-            foreach (var cls in await db.Classes.ToListAsync(ct))
-            {
-                var today = DateOnly.FromDateTime(DateTime.UtcNow.AddHours(7));
-                var session = await db.Sessions.SingleOrDefaultAsync(x => x.ClassRoomId == cls.Id && x.Date == today, ct);
-                if (session == null)
+                foreach (var cls in await db.Classes.ToListAsync(ct))
                 {
-                    session = new()
+                    var today = DateOnly.FromDateTime(DateTime.UtcNow.AddHours(7));
+                    var session = await db.Sessions.SingleOrDefaultAsync(x => x.ClassRoomId == cls.Id && x.Date == today, ct);
+                    if (session == null)
                     {
-                        ClassRoomId = cls.Id,
-                        Date = today
-                    };
-                    db.Sessions.Add(session);
+                        session = new()
+                        {
+                            ClassRoomId = cls.Id,
+                            Date = today
+                        };
+                        db.Sessions.Add(session);
+                    }
+                    session.OpensAtUtc = DateTime.UtcNow.AddMinutes(-30);
+                    session.ClosesAtUtc = DateTime.UtcNow.AddHours(2);
+                    var roster = await db.Rosters.Where(x => x.SessionId == session.Id).Select(x => x.StudentId).ToListAsync(ct);
+                    foreach (var e in await db.Enrollments.Where(x => x.ClassRoomId == cls.Id).ToListAsync(ct))
+                        if (!roster.Contains(e.StudentId))
+                            db.Rosters.Add(new()
+                            {
+                                SessionId = session.Id,
+                                StudentId = e.StudentId,
+                                EnrollmentId = e.Id
+                            });
                 }
-                session.OpensAtUtc = DateTime.UtcNow.AddMinutes(-30);
-                session.ClosesAtUtc = DateTime.UtcNow.AddHours(2);
-                var roster = await db.Rosters.Where(x => x.SessionId == session.Id).Select(x => x.StudentId).ToListAsync(ct);
-                foreach (var e in await db.Enrollments.Where(x => x.ClassRoomId == cls.Id).ToListAsync(ct))
-                if (!roster.Contains(e.StudentId))
-                    db.Rosters.Add(new()
-                    {
-                        SessionId = session.Id,
-                        StudentId = e.StudentId,
-                        EnrollmentId = e.Id
-                    });
-            }
             await db.SaveChangesAsync(ct);
             Directory.CreateDirectory(Path.Combine(root, ".local"));
             await File.WriteAllTextAsync(Path.Combine(root, ".local", "bootstrap-admin.json"), JsonSerializer.Serialize(new

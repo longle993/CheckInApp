@@ -27,9 +27,16 @@ public class CatalogService(AppDbContext db, AccessService access, ScheduleServi
             throw Invalid($"{key} phải là true hoặc false.");
         return p.GetBoolean();
     }
-    static Guid Id(JsonElement d, string k) => Guid.TryParse(Text(d, k), out var id) ? id : throw new AppException(400, "VALIDATION", $"{k} không hợp lệ.");
-    static DateOnly Date(JsonElement d, string k) => DateOnly.TryParseExact(Text(d, k), "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var date) ? date : throw new AppException(400, "VALIDATION", $"{k} phải là yyyy-MM-dd.");
-    public static string Search(string text) => string.Concat(text.Normalize(NormalizationForm.FormD).Where(c => CharUnicodeInfo.GetUnicodeCategory(c) != UnicodeCategory.NonSpacingMark)).Replace('đ', 'd').Replace('Đ', 'D').ToUpperInvariant();
+    static Guid Id(JsonElement d, string k) => Guid.TryParse(Text(d, k), out var id)
+        ? id
+        : throw new AppException(400, "VALIDATION", $"{k} không hợp lệ.");
+    static DateOnly Date(JsonElement d, string k) => DateOnly.TryParseExact(Text(d, k), "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var date)
+        ? date
+        : throw new AppException(400, "VALIDATION", $"{k} phải là yyyy-MM-dd.");
+    public static string Search(string text) => string.Concat(text.Normalize(NormalizationForm.FormD).Where(c => CharUnicodeInfo.GetUnicodeCategory(c) != UnicodeCategory.NonSpacingMark))
+        .Replace('đ', 'd')
+        .Replace('Đ', 'D')
+        .ToUpperInvariant();
     public async Task<object> Save(CatalogCommand c, CancellationToken ct)
     {
         await using var tx = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, ct);
@@ -63,10 +70,26 @@ public class CatalogService(AppDbContext db, AccessService access, ScheduleServi
                 y.EndDate = Date(d, "endDate");
                 if (y.EndDate < y.StartDate || y.EndDate.DayNumber - y.StartDate.DayNumber > 400)
                     throw Invalid("Khoảng năm học không hợp lệ.");
+                if (db.Database.IsSqlServer())
+                    await db.Years.FromSqlRaw("SELECT * FROM [Years] WITH (UPDLOCK,HOLDLOCK)").LoadAsync(ct);
+                var overlap = await db.Years.FirstOrDefaultAsync(x => x.Id != y.Id && x.StartDate <= y.EndDate && y.StartDate <= x.EndDate, ct);
+                if (overlap != null)
+                    throw new AppException(
+                        409,
+                        "YEAR_OVERLAP",
+                        $"Năm học trùng khoảng với {overlap.Name}: {overlap.StartDate:dd/MM/yyyy}–{overlap.EndDate:dd/MM/yyyy}.");
+                var affectedClasses = db.Classes.Where(x => x.AcademicYearId == y.Id).Select(x => x.Id);
+                if (await db.Sessions.AnyAsync(
+                    x => affectedClasses.Contains(x.ClassRoomId) && (x.Date < y.StartDate || x.Date > y.EndDate),
+                    ct)
+                    || await db.Schedules.AnyAsync(
+                    x => affectedClasses.Contains(x.ClassRoomId) && (x.From < y.StartDate || x.Until > y.EndDate),
+                    ct))
+                    throw Invalid("Khoảng năm học mới không bao phủ lịch/buổi hiện có.");
                 y.IsActive = Flag(d, "isActive");
                 if (y.IsActive)
-                foreach (var other in await db.Years.Where(x => x.Id != y.Id && x.IsActive).ToListAsync(ct))
-                    other.IsActive = false;
+                    foreach (var other in await db.Years.Where(x => x.Id != y.Id && x.IsActive).ToListAsync(ct))
+                        other.IsActive = false;
                 if (c.Id == null)
                     db.Years.Add(y);
                 entity = y;
@@ -93,7 +116,13 @@ public class CatalogService(AppDbContext db, AccessService access, ScheduleServi
                 var classId = Id(d, "classRoomId");
                 await access.Class(c.ActorId, classId, ct);
                 var student = c.Id == null ? new Student() : await db.Students.FindAsync([c.Id], ct) ?? throw Missing();
-                if (c.Id != null && !await db.Enrollments.AnyAsync(x => x.StudentId == student.Id && x.ClassRoomId == classId && x.From <= today && (x.Until == null || today < x.Until), ct))
+                if (c.Id != null
+                    && !await db.Enrollments.AnyAsync(
+                    x => x.StudentId == student.Id
+                    && x.ClassRoomId == classId
+                    && x.From <= today
+                    && (x.Until == null || today < x.Until),
+                    ct))
                     throw new AppException(403, "CLASS_SCOPE", "Học sinh không thuộc lớp đã chọn.");
                 if (d.TryGetProperty("givenName", out _) || d.TryGetProperty("familyName", out _))
                 {
@@ -105,7 +134,8 @@ public class CatalogService(AppDbContext db, AccessService access, ScheduleServi
                     (student.FamilyName, student.GivenName) = StudentNames.Split(Text(d, "fullName"));
                 }
                 student.FullName = StudentNames.Full(student.FamilyName, student.GivenName);
-                if (student.FullName.Length > 200) throw Invalid("Họ tên đầy đủ tối đa 200 ký tự.");
+                if (student.FullName.Length > 200)
+                    throw Invalid("Họ tên đầy đủ tối đa 200 ký tự.");
                 student.SaintName = Text(d, "saintName", false);
                 student.DateOfBirth = Date(d, "dateOfBirth");
                 if (student.DateOfBirth > today || student.DateOfBirth < today.AddYears(-120))
@@ -118,7 +148,10 @@ public class CatalogService(AppDbContext db, AccessService access, ScheduleServi
                     var from = d.TryGetProperty("from", out _) ? Date(d, "from") : today;
                     if (from < today)
                         throw Invalid("Ghi danh hồi tố cần quy trình đối soát, không được tự đổi lịch sử.");
-                    var yr = await (from cc in db.Classes join yy in db.Years on cc.AcademicYearId equals yy.Id where cc.Id == classId select yy).SingleAsync(ct);
+                    var yr = await (from cc in db.Classes
+                                    join yy in db.Years on cc.AcademicYearId equals yy.Id
+                                    where cc.Id == classId
+                                    select yy).SingleAsync(ct);
                     if (from < yr.StartDate || from > yr.EndDate)
                         throw Invalid("Ngày ghi danh phải trong năm học.");
                     db.Enrollments.Add(new()
@@ -147,7 +180,9 @@ public class CatalogService(AppDbContext db, AccessService access, ScheduleServi
                 var destYear = await db.Years.SingleAsync(x => x.Id == dest.AcademicYearId, ct);
                 if (effective > destYear.EndDate)
                     throw Invalid("Ngày chuyển ngoài năm học.");
-                var sourceFuture = await db.Sessions.AnyAsync(x => x.ClassRoomId == source.Id && x.Date == effective && x.OpensAtUtc <= clock.GetUtcNow().UtcDateTime, ct);
+                var sourceFuture = await db.Sessions.AnyAsync(
+                    x => x.ClassRoomId == source.Id && x.Date == effective && x.OpensAtUtc <= clock.GetUtcNow().UtcDateTime,
+                    ct);
                 if (sourceFuture)
                     throw Invalid("Buổi của ngày chuyển đã bắt đầu. Chọn ngày tiếp theo.");
                 enrollment.Until = effective;
@@ -161,12 +196,16 @@ public class CatalogService(AppDbContext db, AccessService access, ScheduleServi
             case "catechists":
                 await access.Require(c.ActorId, Permission.CatechistManage, ct);
                 var ca = c.Id == null ? new Catechist() : await db.Catechists.FindAsync([c.Id], ct) ?? throw Missing();
-                if (d.TryGetProperty("givenName", out _) || d.TryGetProperty("familyName", out _)) {
-                    ca.FamilyName=StudentNames.Clean(Text(d,"familyName",false));
-                    ca.GivenName=StudentNames.Clean(Text(d,"givenName"));
-                } else (ca.FamilyName,ca.GivenName)=StudentNames.Split(Text(d,"fullName"));
-                ca.FullName=StudentNames.Full(ca.FamilyName,ca.GivenName);
-                if(ca.FullName.Length>200) throw Invalid("Họ tên đầy đủ tối đa 200 ký tự.");
+                if (d.TryGetProperty("givenName", out _) || d.TryGetProperty("familyName", out _))
+                {
+                    ca.FamilyName = StudentNames.Clean(Text(d, "familyName", false));
+                    ca.GivenName = StudentNames.Clean(Text(d, "givenName"));
+                }
+                else
+                    (ca.FamilyName, ca.GivenName) = StudentNames.Split(Text(d, "fullName"));
+                ca.FullName = StudentNames.Full(ca.FamilyName, ca.GivenName);
+                if (ca.FullName.Length > 200)
+                    throw Invalid("Họ tên đầy đủ tối đa 200 ký tự.");
                 ca.SaintName = Text(d, "saintName", false);
                 if (c.Id == null)
                     db.Catechists.Add(ca);
@@ -178,7 +217,9 @@ public class CatalogService(AppDbContext db, AccessService access, ScheduleServi
                 await access.Class(c.ActorId, assignment.ClassRoomId, ct);
                 if (!await db.Catechists.AnyAsync(x => x.Id == assignment.CatechistId, ct))
                     throw Missing();
-                if (await db.Assignments.AnyAsync(x => x.ClassRoomId == assignment.ClassRoomId && x.CatechistId == assignment.CatechistId && x.Until == null, ct))
+                if (await db.Assignments.AnyAsync(
+                    x => x.ClassRoomId == assignment.ClassRoomId && x.CatechistId == assignment.CatechistId && x.Until == null,
+                    ct))
                     throw Invalid("Giáo lý viên đã được phân công.");
                 db.Assignments.Add(assignment);
                 entity = assignment;
@@ -187,7 +228,10 @@ public class CatalogService(AppDbContext db, AccessService access, ScheduleServi
                 await access.Require(c.ActorId, Permission.ScheduleManage, ct);
                 var sid = Id(d, "classRoomId");
                 await access.Class(c.ActorId, sid, ct);
-                var sc = await db.Schedules.SingleOrDefaultAsync(x => x.ClassRoomId == sid, ct);
+                await schedules.LockClass(sid, ct);
+                var sc = c.Id == null ? null : await db.Schedules.SingleOrDefaultAsync(x => x.Id == c.Id && x.ClassRoomId == sid, ct);
+                if (c.Id != null && sc == null)
+                    throw Missing();
                 var isNew = sc == null;
                 sc ??= new()
                 {
@@ -195,17 +239,27 @@ public class CatalogService(AppDbContext db, AccessService access, ScheduleServi
                 };
                 sc.From = Date(d, "from");
                 sc.Until = Date(d, "until");
-                sc.DaysMask = d.TryGetProperty("daysMask", out var maskElement) && maskElement.ValueKind == JsonValueKind.Number && maskElement.TryGetInt32(out var days) ? days : throw Invalid("Chọn các thứ hợp lệ.");
-                if (!TimeOnly.TryParse(Text(d, "opensAt"), out var open) || !TimeOnly.TryParse(Text(d, "closesAt"), out var close) || open >= close)
+                sc.DaysMask = d.TryGetProperty("daysMask", out var maskElement)
+                    && maskElement.ValueKind == JsonValueKind.Number
+                    && maskElement.TryGetInt32(out var days)
+                    ? days
+                    : throw Invalid("Chọn các thứ hợp lệ.");
+                if (!TimeOnly.TryParse(Text(d, "opensAt"), out var open)
+                    || !TimeOnly.TryParse(Text(d, "closesAt"), out var close)
+                    || open >= close)
                     throw Invalid("Giờ đóng phải sau giờ mở trong cùng ngày.");
                 sc.StudentAttendanceEnabled = Flag(d, "studentAttendanceEnabled", true);
                 sc.CatechistAttendanceEnabled = Flag(d, "catechistAttendanceEnabled", true);
-                if (!sc.StudentAttendanceEnabled && !sc.CatechistAttendanceEnabled) throw Invalid("Chọn ít nhất HS hoặc GLV.");
+                if (!sc.StudentAttendanceEnabled && !sc.CatechistAttendanceEnabled)
+                    throw Invalid("Chọn ít nhất HS hoặc GLV.");
                 sc.OpensAt = open;
                 sc.ClosesAt = close;
                 if (sc.From > sc.Until || sc.DaysMask < 1 || sc.DaysMask > 127)
                     throw Invalid("Chọn ngày và khoảng lịch hợp lệ.");
-                var sy = await (from cc in db.Classes join yy in db.Years on cc.AcademicYearId equals yy.Id where cc.Id == sid select yy).SingleAsync(ct);
+                var sy = await (from cc in db.Classes
+                                join yy in db.Years on cc.AcademicYearId equals yy.Id
+                                where cc.Id == sid
+                                select yy).SingleAsync(ct);
                 if (sc.From < sy.StartDate || sc.Until > sy.EndDate)
                     throw Invalid("Lịch phải trong năm học.");
                 sc.Version++;
@@ -219,18 +273,28 @@ public class CatalogService(AppDbContext db, AccessService access, ScheduleServi
                 var eid = Id(d, "classRoomId");
                 await access.Class(c.ActorId, eid, ct);
                 var edate = Date(d, "date");
-                var exists = await db.Sessions.SingleOrDefaultAsync(x => x.ClassRoomId == eid && x.Date == edate, ct);
+                var exceptionScheduleId = d.TryGetProperty("scheduleId", out var sp) && Guid.TryParse(sp.GetString(), out var parsedSchedule)
+                    ? (Guid?)parsedSchedule
+                    : null;
+                await schedules.LockClass(eid, ct);
+                var exists = await db.Sessions.Where(x => x.ClassRoomId == eid
+                    && (x.SourceDate ?? x.Date) == edate
+                    && (exceptionScheduleId == null || x.ScheduleId == exceptionScheduleId))
+                    .OrderBy(x => x.OpensAtUtc)
+                    .FirstOrDefaultAsync(ct);
                 if (edate < today || (exists != null && exists.OpensAtUtc <= clock.GetUtcNow().UtcDateTime))
                     throw Invalid("Không thay ngoại lệ cho buổi đã bắt đầu hoặc quá khứ.");
-                var sch = await db.Schedules.SingleOrDefaultAsync(x => x.ClassRoomId == eid, ct) ?? throw Invalid("Cần cấu hình lịch trước.");
+                var sch = await db.Schedules.Where(x => x.ClassRoomId == eid && (exceptionScheduleId == null || x.Id == exceptionScheduleId)).OrderBy(x => x.OpensAt)
+                    .FirstOrDefaultAsync(ct) ?? throw Invalid("Cần cấu hình lịch trước.");
                 if (edate < sch.From || edate > sch.Until)
                     throw Invalid("Ngày ngoại lệ ngoài khoảng lịch.");
-                var ex = await db.Exceptions.SingleOrDefaultAsync(x => x.ClassRoomId == eid && x.Date == edate, ct);
+                var ex = await db.Exceptions.SingleOrDefaultAsync(x => x.ClassRoomId == eid && x.ScheduleId == sch.Id && x.Date == edate, ct);
                 if (ex == null)
                 {
                     ex = new()
                     {
                         ClassRoomId = eid,
+                        ScheduleId = sch.Id,
                         Date = edate
                     };
                     db.Exceptions.Add(ex);
@@ -238,7 +302,8 @@ public class CatalogService(AppDbContext db, AccessService access, ScheduleServi
                 ex.Cancelled = Flag(d, "cancelled");
                 ex.StudentAttendanceEnabled = Flag(d, "studentAttendanceEnabled", sch.StudentAttendanceEnabled);
                 ex.CatechistAttendanceEnabled = Flag(d, "catechistAttendanceEnabled", sch.CatechistAttendanceEnabled);
-                if (!ex.Cancelled && !ex.StudentAttendanceEnabled && !ex.CatechistAttendanceEnabled) throw Invalid("Chọn ít nhất HS hoặc GLV.");
+                if (!ex.Cancelled && !ex.StudentAttendanceEnabled && !ex.CatechistAttendanceEnabled)
+                    throw Invalid("Chọn ít nhất HS hoặc GLV.");
                 ex.Reason = Text(d, "reason");
                 ex.OpensAt = sch.OpensAt;
                 ex.ClosesAt = sch.ClosesAt;

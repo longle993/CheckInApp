@@ -1,4 +1,8 @@
-# Giờ vào/ra, thẻ học sinh và Excel
+> **Cập nhật 01/11:** Đã triển khai toàn bộ đợt thay đổi. Xem [hướng dẫn và bằng chứng mới](release-2026-11-01.md). Nội dung bên dưới ghi lại các mốc cũ; đặc tả 01/11 được ưu tiên.
+
+# Giờ vào/ra, thẻ và Excel
+
+> Hiện trạng trước đợt 01/11/2026. [Đặc tả hợp nhất](requirements-2026-11-01.md) ghi yêu cầu đích; tách màn quét, nhiều buổi và tên hiển thị có tên Thánh đang chờ triển khai.
 
 ## Sử dụng
 
@@ -19,9 +23,9 @@ Admin có các quyền mới sau khi API khởi động. Trong **Phân quyền**
 
 ### Chép đè dữ liệu đã có
 
-Ô **Chép đè dữ liệu đã có** nằm cạnh Nhập Excel, mặc định bỏ chọn. Nếu không chọn, dòng đã có được bỏ qua và đếm riêng; nếu chọn, dòng được cập nhật sau khi kiểm tra quyền/phạm vi và dữ liệu hợp lệ. Dòng mới vẫn được thêm ở cả hai chế độ.
+Ô **Chép đè dữ liệu đã có** nằm trong cửa sổ Nhập dữ liệu Excel, mặc định bỏ chọn mỗi lần mở. Nếu không chọn, dòng đã có được bỏ qua và đếm riêng; nếu chọn, dòng được cập nhật sau khi kiểm tra quyền/phạm vi và dữ liệu hợp lệ. Dòng mới vẫn được thêm ở cả hai chế độ.
 
-Học sinh đối chiếu theo họ tên đầy đủ + ngày sinh trong lớp đang chọn; nếu nhiều hồ sơ cùng khớp thì báo lỗi để đối soát. Khi chép đè, ID và mã học sinh được giữ nguyên. Muốn sửa họ tên/ngày sinh của hồ sơ cũ, dùng Chỉnh sửa trên web vì đây là thông tin dùng để nhận diện trùng trong file không có ID. Lớp đối chiếu ID hoặc `code` + `academicYearId`; giáo lý viên đối chiếu họ tên đầy đủ + Tên Thánh trong phạm vi được phép, báo lỗi nếu trùng nhiều hồ sơ. Muốn đổi họ tên/Tên Thánh của giáo lý viên cũ, dùng Chỉnh sửa trên web.
+Học sinh đối chiếu theo họ tên đầy đủ + ngày sinh trong lớp đang chọn; nếu nhiều hồ sơ cùng khớp thì báo lỗi để đối soát. Khi chép đè, ID và mã học sinh được giữ nguyên. Muốn sửa họ tên/ngày sinh của hồ sơ cũ, dùng Chỉnh sửa trên web vì đây là thông tin dùng để nhận diện trùng trong file không có ID. Lớp đối chiếu Mã lớp trong năm học đang chọn; giáo lý viên đối chiếu họ tên đầy đủ + Tên Thánh trong phạm vi được phép, báo lỗi nếu trùng nhiều hồ sơ. Muốn đổi họ tên/Tên Thánh của giáo lý viên cũ, dùng Chỉnh sửa trên web.
 
 ### Đối tượng điểm danh theo lịch
 
@@ -29,7 +33,7 @@ Trong **Cấu hình lịch** và **Ngày nghỉ / bổ sung**, chọn **HS**, **
 
 Cấu hình được chụp lại trên mỗi buổi. Thay lịch chỉ cập nhật buổi tương lai; buổi đã bắt đầu giữ nguyên lịch sử. Lựa chọn trong ngoại lệ áp dụng riêng ngày đó. Các lịch/buổi cũ giữ cả HS và GLV sau migration để bảo toàn hành vi đang có.
 
-Giữ nguyên hàng tiêu đề. Ngày sinh học sinh dùng `dd/MM/yyyy`; cũng nhận `yyyy-MM-dd` hoặc ngày Excel dạng số. Chọn đúng lớp trước khi tải mẫu, xuất hoặc nhập học sinh. Hệ thống tự lấy lớp đang chọn; không nhập ID, mã học sinh hay mã lớp trong file học sinh. Với file lớp học, ID vẫn là GUID lấy từ file xuất; `academicYearId` là ID năm học hiện có. Không nhập tài khoản, mật khẩu, mã QR/Barcode hay thông tin phân quyền qua Excel.
+Giữ nguyên hàng tiêu đề. Ngày sinh học sinh dùng `dd/MM/yyyy`; cũng nhận `yyyy-MM-dd` hoặc ngày Excel dạng số. Chọn đúng lớp trước khi tải mẫu, xuất hoặc nhập học sinh. Hệ thống tự lấy lớp đang chọn; không nhập ID, mã học sinh hay mã lớp trong file học sinh. Với file lớp học, ID tự quản lý và năm học lấy từ lựa chọn hiện tại, không có hai cột này trong file. Không nhập tài khoản, mật khẩu, mã QR/Barcode hay thông tin phân quyền qua Excel.
 
 - Học sinh: **Tên Thánh, Họ và tên đệm, Tên, Ngày sinh** (đúng bốn cột; tải lại mẫu mới).
 - Giáo lý viên: **Tên Thánh, Họ và tên đệm, Tên**. ID do hệ thống quản lý; tải lại mẫu mới.
@@ -37,7 +41,7 @@ Giữ nguyên hàng tiêu đề. Ngày sinh học sinh dùng `dd/MM/yyyy`; cũng
 
 Học sinh mới được tự cấp ID và mã; hồ sơ có sẵn được đối chiếu tự động trong lớp. Danh sách và form học sinh có cột Họ và tên đệm, Tên riêng; các màn xem thông tin, thẻ, điểm danh, báo cáo vẫn ghép thành họ tên đầy đủ. Dữ liệu cũ được chuyển theo từ cuối là Tên, phần còn lại là Họ và tên đệm; các trường hợp tên ghép đặc biệt có thể sửa lại trên form.
 
-Đối với lớp, cập nhật bằng ID đã xuất, tạo mới để trống ID. Không dùng import để chuyển lớp; dùng chức năng Chuyển lớp để giữ lịch sử. Ghi danh mới có hiệu lực ngày hiện tại, trong năm học đang còn hiệu lực.
+Đối với lớp, cập nhật theo Mã lớp trong năm học đang chọn; mã chưa có tạo lớp mới. Không dùng import để chuyển lớp; dùng chức năng Chuyển lớp để giữ lịch sử. Ghi danh mới có hiệu lực ngày hiện tại, trong năm học đang còn hiệu lực.
 
 Mỗi dòng được lưu độc lập. Bảng kết quả nêu số dòng Excel và lỗi cụ thể. Không nhập lại toàn bộ file nếu có dòng thành công: xuất lại dữ liệu hoặc chỉ giữ các dòng lỗi để tránh tạo trùng dữ liệu mới.
 
@@ -60,7 +64,7 @@ Bấm **Nhập Excel** để mở cửa sổ nhập: chọn lớp (với học s
 
 ## Tải mẫu khi chưa chọn lớp
 
-Trong màn Học sinh, nếu đang xem Toàn bộ lớp, bấm **Tải mẫu Excel**, **Nhập Excel** hoặc **Xuất Excel** để mở hộp chọn lớp; chọn lớp rồi bấm **Tiếp tục**. Ứng dụng chọn lớp đó trên bộ lọc và tiếp tục tải file hoặc mở hộp chọn file `.xlsx`. Nếu năm học chưa có lớp, hộp thoại hướng dẫn chọn năm học khác hoặc tạo lớp. Nút chỉ khóa trong lúc xử lý yêu cầu. Lỗi nhập file được giữ rõ trên màn hình và lỗi từng dòng nằm trong bảng kết quả.
+Trong màn Học sinh, nếu đang xem Toàn bộ lớp, bấm **Tải mẫu Excel** hoặc **Xuất Excel** để chọn lớp rồi tiếp tục; **Nhập Excel** mở cửa sổ có chọn lớp, chọn file, checkbox chép đè và nút Nhập dữ liệu. Ứng dụng chọn lớp đó trên bộ lọc và tiếp tục tải file hoặc mở hộp chọn file `.xlsx`. Nếu năm học chưa có lớp, hộp thoại hướng dẫn chọn năm học khác hoặc tạo lớp. Nút chỉ khóa trong lúc xử lý yêu cầu. Lỗi nhập file được giữ rõ trên màn hình và lỗi từng dòng nằm trong bảng kết quả.
 
 Trong màn Giáo lý viên không cần chọn lớp để nhập Excel. Dữ liệu và form quản lý tách Họ và tên đệm/Tên; phân công, thẻ và điểm danh vẫn hiển thị họ tên đầy đủ. Migration SplitCatechistNames chuyển dữ liệu cũ theo từ cuối là Tên và giữ nguyên tài khoản liên kết, thẻ, phân công và lịch sử.
 

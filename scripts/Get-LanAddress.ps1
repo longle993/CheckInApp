@@ -9,5 +9,5 @@ $lanCandidates = foreach ($adapter in [System.Net.NetworkInformation.NetworkInte
     }
 }
 $selectedLan = $lanCandidates | Sort-Object Priority | Select-Object -First 1
-if (!$selectedLan) { throw 'Không tìm thấy IPv4 LAN đang kết nối. Hãy truyền địa chỉ IP rõ ràng.' }
+if (!$selectedLan) { throw 'No LAN IPv4 address found. Pass the address explicitly.' }
 $selectedLan.Address

@@ -10,20 +10,28 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         {
             var student = entry.Entity;
             if ((string.IsNullOrWhiteSpace(student.FamilyName) && string.IsNullOrWhiteSpace(student.GivenName)) ||
-                (entry.State == EntityState.Modified && entry.Property(x => x.FullName).IsModified && !entry.Property(x => x.FamilyName).IsModified && !entry.Property(x => x.GivenName).IsModified))
-                (student.FamilyName,student.GivenName) = StudentNames.Split(student.FullName);
-            student.FamilyName=StudentNames.Clean(student.FamilyName);student.GivenName=StudentNames.Clean(student.GivenName);
-            student.FullName=StudentNames.Full(student.FamilyName,student.GivenName);
-            student.SearchName=CatalogService.Search(student.FullName+" "+student.SaintName);
+                (entry.State == EntityState.Modified
+                    && entry.Property(x => x.FullName).IsModified
+                    && !entry.Property(x => x.FamilyName).IsModified
+                    && !entry.Property(x => x.GivenName).IsModified))
+                (student.FamilyName, student.GivenName) = StudentNames.Split(student.FullName);
+            student.FamilyName = StudentNames.Clean(student.FamilyName);
+            student.GivenName = StudentNames.Clean(student.GivenName);
+            student.FullName = StudentNames.Full(student.FamilyName, student.GivenName);
+            student.SearchName = CatalogService.Search(student.FullName + " " + student.SaintName);
         }
         foreach (var entry in ChangeTracker.Entries<Catechist>().Where(x => x.State is EntityState.Added or EntityState.Modified))
         {
-            var person=entry.Entity;
+            var person = entry.Entity;
             if ((string.IsNullOrWhiteSpace(person.FamilyName) && string.IsNullOrWhiteSpace(person.GivenName)) ||
-                (entry.State==EntityState.Modified && entry.Property(x=>x.FullName).IsModified && !entry.Property(x=>x.FamilyName).IsModified && !entry.Property(x=>x.GivenName).IsModified))
-                (person.FamilyName,person.GivenName)=StudentNames.Split(person.FullName);
-            person.FamilyName=StudentNames.Clean(person.FamilyName);person.GivenName=StudentNames.Clean(person.GivenName);
-            person.FullName=StudentNames.Full(person.FamilyName,person.GivenName);
+                (entry.State == EntityState.Modified
+                    && entry.Property(x => x.FullName).IsModified
+                    && !entry.Property(x => x.FamilyName).IsModified
+                    && !entry.Property(x => x.GivenName).IsModified))
+                (person.FamilyName, person.GivenName) = StudentNames.Split(person.FullName);
+            person.FamilyName = StudentNames.Clean(person.FamilyName);
+            person.GivenName = StudentNames.Clean(person.GivenName);
+            person.FullName = StudentNames.Full(person.FamilyName, person.GivenName);
         }
         return base.SaveChangesAsync(cancellationToken);
     }
@@ -38,6 +46,11 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     protected override void OnModelCreating(ModelBuilder m)
     {
         m.Entity<CatechistCredential>().HasIndex(x => x.TokenHash).IsUnique();
+        m.Entity<Enrollment>().HasIndex(x => new { x.ClassRoomId, x.From, x.Until, x.StudentId });
+        m.Entity<ClassAssignment>().HasIndex(x => new { x.ClassRoomId, x.From, x.Until, x.CatechistId });
+        m.Entity<Student>().HasIndex(x => new { x.FullName, x.Id });
+        m.Entity<Catechist>().HasIndex(x => new { x.FullName, x.Id });
+        m.Entity<AuditLog>().HasIndex(x => new { x.EntityId, x.CreatedAtUtc });
         m.Entity<CatechistCredential>().Property(x => x.TokenHash).HasMaxLength(64);
         m.Entity<CatechistCredential>().HasOne<Catechist>().WithMany().HasForeignKey(x => x.CatechistId).OnDelete(DeleteBehavior.Restrict);
         m.Entity<AttendanceSchedule>().Property(x => x.StudentAttendanceEnabled).HasDefaultValue(true);
@@ -58,14 +71,14 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         m.Entity<AcademicYear>().HasIndex(x => x.Name).IsUnique();
         m.Entity<ClassRoom>().HasIndex(x => new { x.AcademicYearId, x.Code }).IsUnique();
         m.Entity<Student>().HasIndex(x => x.Code).IsUnique();
-        m.Entity<AttendanceSession>().HasIndex(x => new { x.ClassRoomId, x.Date }).IsUnique();
+        m.Entity<AttendanceSession>().HasIndex(x => new { x.ClassRoomId, x.Date, x.OpensAtUtc }).IsUnique();
         m.Entity<SessionRoster>().HasIndex(x => new { x.SessionId, x.StudentId }).IsUnique();
         m.Entity<AttendanceRecord>().HasIndex(x => new { x.SessionId, x.StudentId }).IsUnique();
         m.Entity<IdempotencyRequest>().HasIndex(x => new { x.ActorId, x.Key }).IsUnique();
         m.Entity<StudentCredential>().HasIndex(x => x.TokenHash).IsUnique();
         m.Entity<RefreshToken>().HasIndex(x => x.Hash).IsUnique();
-        m.Entity<ScheduleException>().HasIndex(x => new { x.ClassRoomId, x.Date }).IsUnique();
-        m.Entity<AttendanceSchedule>().HasIndex(x => x.ClassRoomId).IsUnique();
+        m.Entity<ScheduleException>().HasIndex(x => new { x.ClassRoomId, x.ScheduleId, x.Date }).IsUnique();
+        m.Entity<AttendanceSchedule>().HasIndex(x => x.ClassRoomId);
         m.Entity<Catechist>().HasIndex(x => x.UserId).IsUnique().HasFilter("[UserId] IS NOT NULL");
         m.Entity<AttendanceRecord>().Property(x => x.Version).IsConcurrencyToken();
         m.Entity<AttendanceSession>().Property(x => x.Version).IsConcurrencyToken();
@@ -82,14 +95,16 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         m.Entity<SessionRoster>().HasOne<AttendanceSession>().WithMany().HasForeignKey(x => x.SessionId).OnDelete(DeleteBehavior.Restrict);
         m.Entity<SessionRoster>().HasOne<Student>().WithMany().HasForeignKey(x => x.StudentId).OnDelete(DeleteBehavior.Restrict);
         m.Entity<SessionRoster>().HasOne<Enrollment>().WithMany().HasForeignKey(x => x.EnrollmentId).OnDelete(DeleteBehavior.Restrict);
-        m.Entity<AttendanceRecord>().HasOne<SessionRoster>().WithMany().HasForeignKey(x => new { x.SessionId, x.StudentId }).HasPrincipalKey(x => new { x.SessionId, x.StudentId }).OnDelete(DeleteBehavior.Restrict);
+        m.Entity<AttendanceRecord>().HasOne<SessionRoster>().WithMany().HasForeignKey(x => new { x.SessionId, x.StudentId })
+            .HasPrincipalKey(x => new { x.SessionId, x.StudentId })
+            .OnDelete(DeleteBehavior.Restrict);
         m.Entity<StudentCredential>().HasOne<Student>().WithMany().HasForeignKey(x => x.StudentId).OnDelete(DeleteBehavior.Restrict);
         m.Entity<Catechist>().HasOne<AppUser>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict);
         m.Entity<AuthSession>().HasOne<AppUser>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict);
         m.Entity<RefreshToken>().HasOne<AuthSession>().WithMany().HasForeignKey(x => x.AuthSessionId).OnDelete(DeleteBehavior.Restrict);
         foreach (var type in m.Model.GetEntityTypes())
-        foreach (var p in type.GetProperties().Where(p => p.ClrType == typeof(string)))
-            p.SetMaxLength(p.Name == "Detail" ? 4000 : 500);
+            foreach (var p in type.GetProperties().Where(p => p.ClrType == typeof(string)))
+                p.SetMaxLength(p.Name == "Detail" ? 4000 : 500);
         m.Entity<IdempotencyRequest>().Property(x => x.ResponseJson).HasMaxLength(4000);
         m.Entity<AppUser>().Property(x => x.Email).HasMaxLength(256);
         m.Entity<AppRole>().Property(x => x.Name).HasMaxLength(100);

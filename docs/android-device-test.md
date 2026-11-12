@@ -1,3 +1,5 @@
+> Tài liệu vận hành/kiểm thử theo thời điểm ghi nhận. Xem [đặc tả hợp nhất 01/11/2026](requirements-2026-11-01.md) để phân biệt chức năng hiện có và yêu cầu đang chờ triển khai; không coi IP/phiên bản APK hoặc cổng trong ảnh/chỉ dẫn cũ là trạng thái hiện tại đã kiểm tra.
+
 # Cài APK Android và kiểm thử quét thật qua LAN
 
 ## Cài đặt

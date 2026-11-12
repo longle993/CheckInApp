@@ -196,8 +196,7 @@ namespace CheckInApp.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ClassRoomId")
-                        .IsUnique();
+                    b.HasIndex("ClassRoomId");
 
                     b.ToTable("Schedules");
                 });
@@ -228,8 +227,14 @@ namespace CheckInApp.Infrastructure.Migrations
                     b.Property<DateTime>("OpensAtUtc")
                         .HasColumnType("datetime2");
 
+                    b.Property<Guid?>("ScheduleId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<int>("ScheduleVersion")
                         .HasColumnType("int");
+
+                    b.Property<DateOnly?>("SourceDate")
+                        .HasColumnType("date");
 
                     b.Property<bool>("StudentAttendanceEnabled")
                         .ValueGeneratedOnAdd()
@@ -242,7 +247,7 @@ namespace CheckInApp.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ClassRoomId", "Date")
+                    b.HasIndex("ClassRoomId", "Date", "OpensAtUtc")
                         .IsUnique();
 
                     b.ToTable("Sessions");
@@ -279,6 +284,8 @@ namespace CheckInApp.Infrastructure.Migrations
                         .HasColumnType("nvarchar(500)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("EntityId", "CreatedAtUtc");
 
                     b.ToTable("Audit");
                 });
@@ -342,6 +349,8 @@ namespace CheckInApp.Infrastructure.Migrations
                     b.HasIndex("UserId")
                         .IsUnique()
                         .HasFilter("[UserId] IS NOT NULL");
+
+                    b.HasIndex("FullName", "Id");
 
                     b.ToTable("Catechists");
                 });
@@ -433,7 +442,7 @@ namespace CheckInApp.Infrastructure.Migrations
 
                     b.HasIndex("CatechistId");
 
-                    b.HasIndex("ClassRoomId");
+                    b.HasIndex("ClassRoomId", "From", "Until", "CatechistId");
 
                     b.ToTable("Assignments");
                 });
@@ -485,9 +494,9 @@ namespace CheckInApp.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ClassRoomId");
-
                     b.HasIndex("StudentId");
+
+                    b.HasIndex("ClassRoomId", "From", "Until", "StudentId");
 
                     b.ToTable("Enrollments");
                 });
@@ -581,6 +590,9 @@ namespace CheckInApp.Infrastructure.Migrations
                     b.Property<DateOnly>("Date")
                         .HasColumnType("date");
 
+                    b.Property<DateOnly?>("MovedToDate")
+                        .HasColumnType("date");
+
                     b.Property<TimeOnly>("OpensAt")
                         .HasColumnType("time");
 
@@ -589,6 +601,9 @@ namespace CheckInApp.Infrastructure.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
 
+                    b.Property<Guid?>("ScheduleId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<bool>("StudentAttendanceEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("bit")
@@ -596,8 +611,9 @@ namespace CheckInApp.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ClassRoomId", "Date")
-                        .IsUnique();
+                    b.HasIndex("ClassRoomId", "ScheduleId", "Date")
+                        .IsUnique()
+                        .HasFilter("[ScheduleId] IS NOT NULL");
 
                     b.ToTable("Exceptions");
                 });
@@ -671,6 +687,8 @@ namespace CheckInApp.Infrastructure.Migrations
 
                     b.HasIndex("Code")
                         .IsUnique();
+
+                    b.HasIndex("FullName", "Id");
 
                     b.ToTable("Students");
                 });

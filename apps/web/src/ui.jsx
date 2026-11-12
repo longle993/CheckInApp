@@ -9,10 +9,13 @@ import {
 } from "lucide-react";
 import { fmtDate } from "./api";
 import { createPortal } from "react-dom";
-export function Brand() {
+export function Brand({ auth = false }) {
+  const [branding,setBranding]=useState({name:"CheckInApp",logoUrl:null});
+  useEffect(()=>{let live=true;async function load(){try{const r=await fetch("/api/v1/web-settings");if(r.ok){const s=await r.json();if(live){setBranding(s);document.title=s.name;}}}catch{}}load();window.addEventListener("branding-updated",load);return()=>{live=false;window.removeEventListener("branding-updated",load);};},[]);
+
   return (
-    <a href="#tongquan" className="brand">
-      <span className="mark">
+    <a href="#tongquan" className={auth ? "brand auth-brand" : "brand"} aria-label={branding.name}>
+      {branding.logoUrl ? <img src={branding.logoUrl} alt="" onError={()=>setBranding(s=>({...s,logoUrl:null}))} style={{width:32,height:32,objectFit:"contain"}}/> : <span className="mark">
         <svg
           viewBox="0 0 24 24"
           fill="none"
@@ -24,8 +27,8 @@ export function Brand() {
           <rect x="4" y="4" width="7" height="7" rx="1" />
           <path d="M15 4h5v5M4 15v5h5m6-3 2 2 4-5" />
         </svg>
-      </span>
-      CheckInApp
+      </span>}
+      {!auth && branding.name}
     </a>
   );
 }
@@ -49,11 +52,12 @@ export function Button({
 export function Badge({ children, kind = "neutral" }) {
   return <span className={"badge " + kind}>{children}</span>;
 }
-export function Head({ title, subtitle, children }) {
+export function Head({ title, subtitle, children, level=1 }) {
+  const Title=level===2?"h2":"h1";
   return (
     <div className="pagehead">
       <div>
-        <h1>{title}</h1>
+        <Title>{title}</Title>
         {subtitle && <p>{subtitle}</p>}
       </div>
       {children && <div className="head-actions">{children}</div>}
@@ -123,7 +127,7 @@ export function DatePicker({ value, onChange, label = "Chọn ngày" }) {
         <div data-calendar-layer onKeyDown={e => {
           if(e.key === "Escape") {e.stopPropagation();setOpen(false);anchor.current?.querySelector("button")?.focus();}
           if(e.key === "Tab") {
-            const buttons = [...popup.current.querySelectorAll("button:not([disabled])")];
+            const buttons = [...popup.current.querySelectorAll("button:not([disabled]),select:not([disabled]),input:not([disabled])")];
             if(e.shiftKey && document.activeElement === buttons[0]) { e.preventDefault(); buttons.at(-1)?.focus(); }
             else if(!e.shiftKey && document.activeElement === buttons.at(-1)) { e.preventDefault(); buttons[0]?.focus(); }
           }
@@ -145,7 +149,8 @@ export function DatePicker({ value, onChange, label = "Chọn ngày" }) {
               >
                 <ChevronLeft />
               </Button>
-              <strong>{month.split("-").reverse().join("/")}</strong>
+              <select aria-label="Chọn tháng" value={first.getMonth()+1} onChange={e=>setMonth(`${first.getFullYear()}-${String(e.target.value).padStart(2,'0')}`)}>{Array.from({length:12},(_,i)=><option key={i+1} value={i+1}>Tháng {i+1}</option>)}</select>
+              <input aria-label="Chọn năm" type="number" min="1" max="9999" value={first.getFullYear()} style={{width:80}} onChange={e=>{const year=Number(e.target.value);if(year>=1&&year<=9999)setMonth(`${String(year).padStart(4,'0')}-${String(first.getMonth()+1).padStart(2,'0')}`)}}/>
               <Button
                 ghost
                 className="icon"
@@ -196,6 +201,7 @@ export function Modal({ title, children, onClose, wide = false }) {
     document.body.style.overflow = "hidden";
     const dialog = container.current;
     const first =
+      dialog.querySelector("[data-initial-focus]") ||
       dialog.querySelector("input:not([disabled])") ||
       dialog.querySelector("button");
     first?.focus();
@@ -294,7 +300,7 @@ export function Table({ columns, rows, rowKey = "id" }) {
         <thead>
           <tr>
             {columns.map((c, i) => (
-              <th key={i}>{c.label}</th>
+              <th key={i} className={c.className}>{c.label}</th>
             ))}
           </tr>
         </thead>
@@ -302,7 +308,7 @@ export function Table({ columns, rows, rowKey = "id" }) {
           {rows.map((r, i) => (
             <tr key={r[rowKey] || i}>
               {columns.map((c, j) => (
-                <td key={j} data-label={c.label}>
+                <td key={j} className={c.className} data-label={typeof c.label==="string"?c.label:""}>
                   {c.render ? c.render(r) : (r[c.key] ?? "—")}
                 </td>
               ))}
