@@ -32,11 +32,11 @@ export async function api(path, options = {}, retry = true) {
         })
         .finally(() => (refreshing = null));
       await refreshing;
-      return api(path, options, false);
     } catch {
       clearToken();
       window.dispatchEvent(new Event("session-expired"));
     }
+    if(accessToken){options.signal?.throwIfAborted();return api(path,options,false);}
   }
   if (!response.ok) {
     let data;

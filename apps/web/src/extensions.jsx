@@ -4,14 +4,14 @@ import { displayPerson, api, can, fmtTime } from './api';
 import { Button, Modal, Table, Select } from './ui';
 export function download(blob, name) { const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(url), 10000); }
 export function ExcelActions({kind,user,classId,className,classes=[],onClassChange,yearId,refresh,toast}) {
-  const bits={students:[21,22],catechists:[23,24],classes:[25,26]}[kind];
+  const bits={students:[21,22],catechists:[23,24],classes:[25,26],years:[35,36]}[kind];
   const [busy,setBusy]=useState(false),[results,setResults]=useState(null),[overwriteExisting,setOverwriteExisting]=useState(false),[choice,setChoice]=useState(null),[error,setError]=useState(""),[importOpen,setImportOpen]=useState(false),[selectedFile,setSelectedFile]=useState(null),[targetClass,setTargetClass]=useState("");
   const input=useRef(null),importClass=useRef(null);
   if(!bits)return null;
   const needsClass=kind==="students"&&!classId;
   function run(action,id){setError("");if(action==="import"){setTargetClass(id||"");setSelectedFile(null);setOverwriteExisting(false);setImportOpen(true);}else exportFile(action==="template",id);}
   function start(action){if(action==="import"){run(action,classId);return;}if(needsClass){setChoice({action,id:classes[0]?.id||""});return;}run(action,classId);}
-  async function exportFile(template,id){setBusy(true);setError("");try{const q=new URLSearchParams({template});if(kind==="students")q.set("classId",id);if(yearId&&kind==="classes")q.set("yearId",yearId);const label={students:"HocSinh",catechists:"GiaoLyVien",classes:"LopHoc"}[kind];download(await api(`/excel/${kind}?${q}`,{blob:true}),`CheckInApp-${label}${template?"-MauNhap":""}.xlsx`);}catch(e){setError(e.message);}finally{setBusy(false);}}
+  async function exportFile(template,id){setBusy(true);setError("");try{const q=new URLSearchParams({template});if(kind==="students")q.set("classId",id);if(yearId&&kind==="classes")q.set("yearId",yearId);const label={students:"HocSinh",catechists:"GiaoLyVien",classes:"LopHoc",years:"NamHoc"}[kind];download(await api(`/excel/${kind}?${q}`,{blob:true}),`CheckInApp-${label}${template?"-MauNhap":""}.xlsx`);}catch(e){setError(e.message);}finally{setBusy(false);}}
   async function importFile(file){if(!file)return;const selectedClassId=importClass.current||classId;setError("");if(kind==="students"&&!selectedClassId){setError("Chọn lớp trước khi nhập học sinh.");return;}if(file.size>5000000||!file.name.toLowerCase().endsWith('.xlsx')){setError("Chọn file .xlsx tối đa 5 MB.");return;}setBusy(true);try{const base64=await new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result.split(',')[1]);r.onerror=reject;r.readAsDataURL(file);});const r=await api(`/excel/${kind}`,{method:'POST',body:{base64,overwriteExisting,...(kind==="classes"?{yearId}:{}),...(kind==="students"?{classId:selectedClassId}:{})}});setImportOpen(false);setResults(r.results);refresh();}catch(e){setError(e.message);}finally{setBusy(false);}}
   return <><div className="excel-actions">
     {can(user,bits[1])&&<Button disabled={busy} onClick={()=>start("export")}><FileOutput size={16}/>Xuất Excel</Button>}
@@ -20,7 +20,7 @@ export function ExcelActions({kind,user,classId,className,classes=[],onClassChan
   </div>
   {error&&!importOpen&&<p className="form-error excel-error" role="alert">{error}</p>}
   {importOpen&&<Modal title="Nhập dữ liệu Excel" onClose={()=>{if(!busy){setImportOpen(false);setError("");}}}>
-    <p className="small muted">{kind==="students"?"Học sinh: Tên Thánh, Họ và tên đệm, Tên, Ngày sinh (dd/MM/yyyy).":kind==="catechists"?"Giáo lý viên: Tên Thánh, Họ và tên đệm, Tên.":"Lớp học: Mã lớp, Tên lớp. Áp dụng cho năm học đang chọn."} File .xlsx, tối đa 5 MB.</p>
+    <p className="small muted">{kind==="students"?"Học sinh: Tên Thánh, Họ và tên đệm, Tên, Ngày sinh (dd/MM/yyyy).":kind==="years"?"Năm học: Năm học, Ngày bắt đầu, Ngày kết thúc (yyyy-MM-dd), Hiện hành (0/1).":kind==="catechists"?"Giáo lý viên: Tên Thánh, Họ và tên đệm, Tên.":"Lớp học: Mã lớp, Tên lớp. Áp dụng cho năm học đang chọn."} File .xlsx, tối đa 5 MB.</p>
     {kind==="students"&&<div className="field"><label>Lớp nhận dữ liệu</label><Select label="Lớp nhận dữ liệu Excel" value={targetClass} options={[{value:"",label:"Chọn lớp"},...classes.map(c=>({value:c.id,label:c.name}))]} onChange={setTargetClass}/>{!classes.length&&<p className="small muted">Chưa có lớp trong năm học đang chọn.</p>}</div>}
     <label className="field excel-file-field">Chọn file Excel<input className="input" type="file" accept=".xlsx" disabled={busy} onChange={e=>{setSelectedFile(e.target.files[0]||null);setError("");}}/></label>
     <label className="row"><input type="checkbox" className="check" checked={overwriteExisting} disabled={busy} onChange={e=>setOverwriteExisting(e.target.checked)}/>Chép đè dữ liệu đã có</label>

@@ -15,20 +15,38 @@ public class AuthService(AppDbContext db, IConfiguration config, AccessService a
 {
     public async Task ChangePassword(Guid actor, string currentPassword, string newPassword, string confirmation, CancellationToken ct)
     {
-        if (string.IsNullOrEmpty(currentPassword) || currentPassword.Length>128) throw new AppException(400,"CURRENT_PASSWORD","Nhập mật khẩu hiện tại hợp lệ.");
-        if(newPassword!=confirmation) throw new AppException(400,"PASSWORD_MISMATCH","Xác nhận mật khẩu mới không khớp.");
+        if (string.IsNullOrEmpty(currentPassword) || currentPassword.Length > 128)
+            throw new AppException(400, "CURRENT_PASSWORD", "Nhập mật khẩu hiện tại hợp lệ.");
+        if (newPassword != confirmation)
+            throw new AppException(400, "PASSWORD_MISMATCH", "Xác nhận mật khẩu mới không khớp.");
         ValidatePassword(newPassword);
-        if(currentPassword==newPassword) throw new AppException(400,"PASSWORD_UNCHANGED","Mật khẩu mới phải khác mật khẩu hiện tại.");
-        await using var tx=await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable,ct);
-        var query=db.Database.IsSqlServer()?db.Users.FromSqlInterpolated($"SELECT * FROM [AspNetUsers] WITH (UPDLOCK, ROWLOCK) WHERE [Id] = {actor}"):db.Users.Where(x=>x.Id==actor);
-        var user=await query.SingleOrDefaultAsync(ct);
-        if(user==null || user.Status!=AccountStatus.Active) throw new AppException(403,"ACCOUNT_INACTIVE","Tài khoản chưa hoạt động.");
-        var hasher=new PasswordHasher<AppUser>();
-        if(hasher.VerifyHashedPassword(user,user.PasswordHash,currentPassword)==PasswordVerificationResult.Failed) throw new AppException(400,"CURRENT_PASSWORD","Mật khẩu hiện tại không đúng.");
-        user.PasswordHash=hasher.HashPassword(user,newPassword);
-        foreach(var session in await db.AuthSessions.Where(x=>x.UserId==actor&&!x.Revoked).ToListAsync(ct)){session.Revoked=true;session.Version=Guid.NewGuid();}
-        db.Audit.Add(new() {ActorId=actor,Action="ChangePassword",EntityType="User",EntityId=actor});
-        await db.SaveChangesAsync(ct);await tx.CommitAsync(ct);
+        if (currentPassword == newPassword)
+            throw new AppException(400, "PASSWORD_UNCHANGED", "Mật khẩu mới phải khác mật khẩu hiện tại.");
+        await using var tx = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, ct);
+        var query = db.Database.IsSqlServer()
+            ? db.Users.FromSqlInterpolated($"SELECT * FROM [AspNetUsers] WITH (UPDLOCK, ROWLOCK) WHERE [Id] = {actor}")
+            : db.Users.Where(x => x.Id == actor);
+        var user = await query.SingleOrDefaultAsync(ct);
+        if (user == null || user.Status != AccountStatus.Active)
+            throw new AppException(403, "ACCOUNT_INACTIVE", "Tài khoản chưa hoạt động.");
+        var hasher = new PasswordHasher<AppUser>();
+        if (hasher.VerifyHashedPassword(user, user.PasswordHash, currentPassword) == PasswordVerificationResult.Failed)
+            throw new AppException(400, "CURRENT_PASSWORD", "Mật khẩu hiện tại không đúng.");
+        user.PasswordHash = hasher.HashPassword(user, newPassword);
+        foreach (var session in await db.AuthSessions.Where(x => x.UserId == actor && !x.Revoked).ToListAsync(ct))
+        {
+            session.Revoked = true;
+            session.Version = Guid.NewGuid();
+        }
+        db.Audit.Add(new()
+        {
+            ActorId = actor,
+            Action = "ChangePassword",
+            EntityType = "User",
+            EntityId = actor
+        });
+        await db.SaveChangesAsync(ct);
+        await tx.CommitAsync(ct);
     }
     public static string Hash(string value) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value)));
     public static string RandomToken() => Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
@@ -56,10 +74,16 @@ public class AuthService(AppDbContext db, IConfiguration config, AccessService a
     {
         var email = input.Email.Trim().ToLowerInvariant();
         var user = await db.Users.SingleOrDefaultAsync(x => x.Email == email, ct);
-        if (user == null || new PasswordHasher<AppUser>().VerifyHashedPassword(user, user.PasswordHash, input.Password) == PasswordVerificationResult.Failed)
+        if (user == null
+            || new PasswordHasher<AppUser>().VerifyHashedPassword(user, user.PasswordHash, input.Password) == PasswordVerificationResult.Failed)
             throw new AppException(401, "LOGIN_FAILED", "Email hoặc mật khẩu không đúng.");
         if (user.Status != AccountStatus.Active)
-            throw new AppException(403, "ACCOUNT_" + user.Status.ToString().ToUpperInvariant(), user.Status == AccountStatus.PendingApproval ? "Tài khoản đang chờ admin duyệt." : "Tài khoản chưa được phép sử dụng.");
+            throw new AppException(
+                403,
+                "ACCOUNT_" + user.Status.ToString().ToUpperInvariant(),
+                user.Status == AccountStatus.PendingApproval
+                ? "Tài khoản đang chờ admin duyệt."
+                : "Tài khoản chưa được phép sử dụng.");
         var session = new AuthSession { UserId = user.Id, ExpiresAtUtc = clock.GetUtcNow().UtcDateTime.AddDays(7) };
         db.AuthSessions.Add(session);
         var refresh = RandomToken();
@@ -107,15 +131,18 @@ public class AuthService(AppDbContext db, IConfiguration config, AccessService a
     {
         var u = await db.Users.AsNoTracking().SingleAsync(x => x.Id == id, ct);
         var rights = await access.Rights(id, ct);
-        var profile=await db.Catechists.AsNoTracking().FirstOrDefaultAsync(x=>x.UserId==id,ct);
+        var profile = await db.Catechists.AsNoTracking().FirstOrDefaultAsync(x => x.UserId == id, ct);
         return new
         {
             id = u.Id,
             u.Email,
-            fullName=profile?.FullName??u.FullName,
-            saintName=profile?.SaintName,
-            catechistId=profile?.Id,
-            roles=await (from ur in db.UserRoles join r in db.Roles on ur.RoleId equals r.Id where ur.UserId==id select r.Name).ToListAsync(ct),
+            fullName = profile?.FullName ?? u.FullName,
+            saintName = profile?.SaintName,
+            catechistId = profile?.Id,
+            roles = await (from ur in db.UserRoles
+                           join r in db.Roles on ur.RoleId equals r.Id
+                           where ur.UserId == id
+                           select r.Name).ToListAsync(ct),
             status = u.Status.ToString(),
             permissions = rights.Mask.ToString(),
             globalScope = rights.Global
@@ -125,7 +152,13 @@ public class AuthService(AppDbContext db, IConfiguration config, AccessService a
     {
         var expires = clock.GetUtcNow().UtcDateTime.AddMinutes(15);
         var key = config["Jwt:Key"] ?? throw new InvalidOperationException("JWT key missing");
-        var jwt = new JwtSecurityToken(config["Jwt:Issuer"], config["Jwt:Audience"], new[] { new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()), new Claim("sid", session.Id.ToString()), new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()) }, notBefore: clock.GetUtcNow().UtcDateTime, expires: expires, signingCredentials: new(new SymmetricSecurityKey(Encoding.UTF8.GetBytes(key)), SecurityAlgorithms.HmacSha256));
+        var jwt = new JwtSecurityToken(
+            config["Jwt:Issuer"],
+            config["Jwt:Audience"],
+            new[] { new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()), new Claim("sid", session.Id.ToString()), new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()) },
+            notBefore: clock.GetUtcNow().UtcDateTime,
+            expires: expires,
+            signingCredentials: new(new SymmetricSecurityKey(Encoding.UTF8.GetBytes(key)), SecurityAlgorithms.HmacSha256));
         return new(new JwtSecurityTokenHandler().WriteToken(jwt), refresh, expires, await Me(user.Id, ct));
     }
 }

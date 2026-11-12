@@ -1,5 +1,7 @@
 # CheckInApp
 
+Đã triển khai web/API, kiểm thử QA: [chỉnh giao diện, xóa hàng loạt, lịch cha/con và widget Bảng điểm danh — 02/11/2026](docs/design-attendance-ui-2026-11-02.md). Xem [hướng dẫn, kiểm thử và giới hạn](docs/release-ui-2026-11-02.md) và [thuật toán tìm kiếm, tối ưu tải dữ liệu, số đo trước/sau](docs/search-performance-2026-11-02.md).
+
 Thiết kế đang chờ triển khai: [đăng nhập web desktop/mobile ngày02/11/2026](docs/design-login-2026-11-02.md), theo ảnh tham khảo và nhận diện Xứ đoàn Thiên Thần Raphael.
 
 Bản hiện tại: [0.2.0 — hướng dẫn widget, báo cáo, avatar và in lô](docs/release-0.2.0.md).
@@ -166,3 +168,5 @@ Token màu/font của web nằm trong `apps/web/src/styles.css` và `production.
 # CheckInApp
 
 
+
+Điều chỉnh UI, nhóm quyền và tối ưu báo cáo 05/11/2026: [tài liệu và kiểm thử](docs/ui-refinement-2026-11-05.md).

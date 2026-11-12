@@ -1,5 +1,7 @@
 # CheckInApp — brief và đặc tả mở rộng giao diện 01/11/2026
 
+> Đợt tiếp theo: [chỉnh giao diện và điểm danh 02/11/2026](design-attendance-ui-2026-11-02.md), **đã triển khai web/API và kiểm thử QA**, xem [bản cập nhật](release-ui-2026-11-02.md). Đợt mới thay tùy chỉnh thứ tự widget bằng lưới kéo thả, bổ sung Bảng điểm danh, lịch cha/con và thao tác xóa theo lựa chọn; đồng thời cập nhật quy tắc năm mặc định và các lỗi cần sửa. Nội dung dưới đây mô tả đợt 0.2.0, không phải kết quả của đợt mới.
+
 ## 1. Trạng thái và phạm vi
 
 **Đã chọn phương án A và triển khai bản 0.2.0.** Kết quả và giới hạn thực tế ở [release-0.2.0.md](release-0.2.0.md); phần bên dưới giữ đặc tả đã duyệt để đối chiếu. Không thay schema SQL trong đợt này. Đây là phần bổ sung sau bản phát hành 01/11; trạng thái từng nhóm cần đối chiếu với bản phát hành, không suy từ đặc tả ra kết quả kiểm thử. Khi có mâu thuẫn, tài liệu này thay thế đúng quy tắc tương ứng của `requirements-2026-11-01.md`; các chức năng khác giữ nguyên.

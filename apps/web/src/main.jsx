@@ -103,7 +103,7 @@ const nav = [
   ["namhoc", "Năm học", CalendarRange, 6],
   ["admin", "Admin Console", ShieldCheck, 14],
 ];
-function useData(path) {
+function useData(path, delay = 0) {
   const { revision } = useApp();
   const [state, setState] = useState({
     loading: !!path,
@@ -118,14 +118,15 @@ function useData(path) {
       return;
     }
     setState((s) => ({ ...s, loading: true, error: null }));
-    api(path)
-      .then((data) => live && setState({ data, loading: false, error: null }))
+    const controller = new AbortController();
+    const timer = setTimeout(()=>api(path,{signal:controller.signal})
+      .then((data) => live && setState({ data, path, loading: false, error: null }))
       .catch(
-        (error) => live && setState({ data: null, loading: false, error }),
-      );
-    return () => (live = false);
-  }, [path, revision, again]);
-  return { ...state, reload: () => setAgain((x) => x + 1) };
+        (error) => live && error.name!=="AbortError" && setState({ data: null, path, loading: false, error }),
+      ),delay);
+    return () => {live=false;clearTimeout(timer);controller.abort()};
+  }, [path, revision, again, delay]);
+  return { ...state, data:state.path===path?state.data:null, reload: () => setAgain((x) => x + 1) };
 }
 const query = (obj) =>
   new URLSearchParams(
@@ -158,7 +159,7 @@ const rate = (r) =>
   r == null
     ? "Chưa có buổi"
     : Number(r).toLocaleString("vi-VN", { maximumFractionDigits: 2 }) + "%";
-function Stats({ items }) {
+export function Stats({ items }) {
   return (
     <div className="stats">
       {items.map(([label, value, desc, Icon]) => (
@@ -658,23 +659,25 @@ function App() {
     if (!user) return;
     let live = true;
     if (can(user, 6))
-      api("/catalog/years")
+      api("/catalog/years?pageSize=1000")
         .then((d) => {
           if (live) {
             setYears(d.items);
             setYearId(v=>{
               if(v&&d.items.some(y=>y.id===v))return v;
-              const valid=d.items.filter(y=>y.startDate<=today()&&y.endDate>=today());return valid.length===1?valid[0].id:"";
+              const active=d.items.filter(y=>y.isActive); if(active.length) return active.length===1?active[0].id:""; const valid=d.items.filter(y=>y.startDate<=today()&&y.endDate>=today());return valid.length===1?valid[0].id:"";
             });
           }
         })
         .catch(() => {});
-    if (can(user, 0)&&yearId)
-      api("/catalog/classes?pageSize=1000" + (yearId ? "&yearId=" + yearId : ""))
-        .then((d) => live && setClasses(d.items))
-        .catch(() => {});
     return () => (live = false);
-  }, [user, revision, yearId]);
+  }, [user, revision]);
+  useEffect(()=>{
+    if(!user||!can(user,0)||!yearId){setClasses([]);return}
+    let live=true;const controller=new AbortController();setClasses([]);
+    api('/catalog/classes?pageSize=1000&yearId='+yearId,{signal:controller.signal}).then(d=>live&&setClasses(d.items)).catch(()=>{});
+    return()=>{live=false;controller.abort()};
+  },[user,revision,yearId]);
   useEffect(() => {
     if (!toastMessage) return;
     const t = setTimeout(() => setToastMessage(""), 4000);
@@ -730,7 +733,7 @@ function App() {
       <Brand />
       <nav>
         {visibleNav.filter(n=>!["quet","quet-glv","baocao","baocao-gio"].includes(n[0])).map(([key,label,Icon])=><a href={"#"+key} key={key} className="navitem" aria-current={route===key?"page":undefined}><Icon/><span>{label}</span></a>)}
-        {[["Điểm danh",["quet","quet-glv"]],["Báo cáo",["baocao","baocao-gio"]]].map(([label,keys])=>visibleNav.some(n=>keys.includes(n[0]))&&<details key={label} open><summary className="navitem">{label}</summary>{visibleNav.filter(n=>keys.includes(n[0])).map(([key,name,Icon])=><a style={{paddingLeft:30}} className="navitem" key={key} href={"#"+key} aria-current={route===key?"page":undefined}><Icon/><span>{name}</span></a>)}</details>)}
+        {[["Điểm danh",["quet","quet-glv"]],["Báo cáo",["baocao","baocao-gio"]]].map(([label,keys])=>visibleNav.some(n=>keys.includes(n[0]))&&<details key={label} open><summary className="navitem">{label==="Điểm danh"?<ScanLine/>:<ChartNoAxesCombined/>}<span>{label}</span><span className="nav-chevron" aria-hidden="true">⌄</span></summary>{visibleNav.filter(n=>keys.includes(n[0])).map(([key,name,Icon])=><a style={{paddingLeft:30}} className="navitem" key={key} href={"#"+key} aria-current={route===key?"page":undefined}><Icon/><span>{name}</span></a>)}</details>)}
 
       </nav>
       <div className="profile">
@@ -778,6 +781,7 @@ function App() {
             />
             {!yearId&&<span role="status" className="small muted">{years.filter(y=>y.startDate<=today()&&y.endDate>=today()).length>1?"Có nhiều năm học trùng ngày hiện tại. Hãy chọn năm.":"Chưa có năm học phù hợp hôm nay. Hãy chọn năm."}</span>}
             <span className="spacer" />
+            {route==="tongquan"&&<div id="dashboard-customize-slot"/>}
             <span className="small muted smallhide">{fmtDate(today())}</span>
           </header>
           <div className="content"><RouteBoundary key={route}><React.Suspense fallback={<p role="status">Đang tải màn hình…</p>}>

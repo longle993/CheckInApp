@@ -285,6 +285,8 @@ namespace CheckInApp.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("EntityId", "CreatedAtUtc");
+
                     b.ToTable("Audit");
                 });
 
@@ -347,6 +349,8 @@ namespace CheckInApp.Infrastructure.Migrations
                     b.HasIndex("UserId")
                         .IsUnique()
                         .HasFilter("[UserId] IS NOT NULL");
+
+                    b.HasIndex("FullName", "Id");
 
                     b.ToTable("Catechists");
                 });
@@ -438,7 +442,7 @@ namespace CheckInApp.Infrastructure.Migrations
 
                     b.HasIndex("CatechistId");
 
-                    b.HasIndex("ClassRoomId");
+                    b.HasIndex("ClassRoomId", "From", "Until", "CatechistId");
 
                     b.ToTable("Assignments");
                 });
@@ -490,9 +494,9 @@ namespace CheckInApp.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ClassRoomId");
-
                     b.HasIndex("StudentId");
+
+                    b.HasIndex("ClassRoomId", "From", "Until", "StudentId");
 
                     b.ToTable("Enrollments");
                 });
@@ -683,6 +687,8 @@ namespace CheckInApp.Infrastructure.Migrations
 
                     b.HasIndex("Code")
                         .IsUnique();
+
+                    b.HasIndex("FullName", "Id");
 
                     b.ToTable("Students");
                 });

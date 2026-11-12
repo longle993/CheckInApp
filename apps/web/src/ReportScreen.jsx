@@ -45,7 +45,7 @@ import {
   Table,
 } from "./ui";
 import { ExcelActions, PresencePanel } from "./extensions";
-import {useApp,useData,query,nameCell,rate,Status,statusNames,permissionLabels,Editor,previewDays} from "./main";
+import {Stats,useApp,useData,query,nameCell,rate,Status,statusNames,permissionLabels,Editor,previewDays} from "./main";
 export function Report() {
   const app = useApp(),
     [from, setFrom] = useState(
@@ -56,19 +56,20 @@ export function Report() {
     [tab, setTab] = useState("all"),
     [missingDate, setMissingDate] = useState(today()),
     [sid, setSid] = useState("");
+  useEffect(()=>{const y=app.years.find(y=>y.id===app.yearId);if(y){setFrom(y.startDate);setUntil(today()<y.startDate?y.endDate:today()>y.endDate?y.endDate:today());}setSid('')},[app.yearId]);
   const report = useData(
-    "/reports/attendance?" +
+    app.yearId ? "/reports/attendance?" +
       query({
         from,
         until,
         yearId: app.yearId,
         classId: tab === "all" ? "" : app.classId,
-      }),
+      }) : null,
   );
   const sessions = useData(
-    tab === "missing"
+    tab === "missing" && app.yearId
       ? "/attendance-sessions?" +
-          query({ from: missingDate, until: missingDate, classId: app.classId })
+          query({ from: missingDate, until: missingDate, classId: app.classId,yearId:app.yearId })
       : null,
   );
   useEffect(() => {
@@ -135,6 +136,7 @@ export function Report() {
     a.click();
     URL.revokeObjectURL(url);
   }
+  if(!app.yearId)return <><Head title="Báo cáo chuyên cần"/><p>Chọn năm học để xem báo cáo.</p></>;
   return (
     <>
       <Head

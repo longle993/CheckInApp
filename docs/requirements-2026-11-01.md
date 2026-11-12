@@ -1,6 +1,8 @@
 # CheckInApp — đặc tả hợp nhất và brief thay đổi 01/11/2026
 
-> **Đợt bổ sung sau phát hành:** [Brief tổng quan, widget, năm học, lịch, báo cáo giờ, tài khoản, avatar/in lô và lazy load](design-dashboard-expansion-2026-11-01.md). Đây là tài liệu chờ duyệt, chưa triển khai; trạng thái hoàn thành bên dưới chỉ áp dụng đợt trước.
+> **Đợt bổ sung sau phát hành:** [Tổng quan, widget, năm học, lịch, báo cáo giờ, tài khoản, avatar/in lô và lazy load](design-dashboard-expansion-2026-11-01.md) đã triển khai bản 0.2.0; xem giới hạn trong [bản phát hành](release-0.2.0.md).
+>
+> **Yêu cầu mới đã triển khai web/API, kiểm thử QA:** [Đặc tả giao diện và điểm danh 02/11/2026](design-attendance-ui-2026-11-02.md), gồm năm hiện hành, list/card, lịch cha/con, xóa liên đới theo lô, sửa chuyên cần, chọn tháng/năm, lưới widget và Bảng điểm danh. Tài liệu mới thay thế đúng quy tắc tương ứng; kết quả kiểm thử bên dưới không xác nhận các yêu cầu mới. Xem [bằng chứng đợt 02/11](release-ui-2026-11-02.md).
 
 ## Trạng thái và thứ tự áp dụng
 

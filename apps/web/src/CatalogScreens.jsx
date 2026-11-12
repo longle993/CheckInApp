@@ -6,6 +6,7 @@ import React, {
   useState,
 } from "react";
 import {
+  List, LayoutGrid, Trash2,
   LayoutDashboard,
   ScanLine,
   School,
@@ -49,9 +50,11 @@ import {
 } from "./ui";
 import { ExcelActions, PresencePanel } from "./extensions";
 import {useApp,useData,query,nameCell,rate,Status,statusNames,permissionLabels,Editor,previewDays} from "./main";
+import BulkDelete from './BulkDelete';
 const BatchPrint=React.lazy(()=>import("./BatchPrint"));
 export function CatalogPage({ type }) {
   const [avatarEdit,setAvatarEdit]=useState(null),[batchOpen,setBatchOpen]=useState(false);
+  const [view,setView]=useState("list"),[selecting,setSelecting]=useState(false),[selected,setSelected]=useState([]),[confirmDelete,setConfirmDelete]=useState(false);
   const app = useApp(),
     [search, setSearch] = useState(""),
     [page, setPage] = useState(1),
@@ -77,10 +80,14 @@ export function CatalogPage({ type }) {
         pageSize,
         ...(["lop","hocsinh"].includes(type) ? { yearId } : {}),
         ...(type === "hocsinh" ? { classId } : {}),
-      }),
+      }), search.trim()?250:0,
   );
   useEffect(()=>{setPage(1);},[classId,yearId]);
   let rows = data.data?.items || [];
+  useEffect(()=>{setSelected([]);setSelecting(false)},[type,search,page,pageSize,classId,yearId]);
+  useEffect(()=>{if(data.data?.total!=null&&page>Math.max(1,Math.ceil(data.data.total/pageSize)))setPage(Math.max(1,Math.ceil(data.data.total/pageSize)))},[data.data,page,pageSize]);
+  function toggle(id){setSelected(v=>v.includes(id)?v.filter(x=>x!==id):[...v,id])}
+
   const yearOptions = years.map((y) => ({ value: y.id, label: y.name })),
     classOptions = classes.map((c) => ({ value: c.id, label: c.name }));
   const fields = {
@@ -146,7 +153,7 @@ export function CatalogPage({ type }) {
             { label: "Họ và tên đệm", key: "familyName" },
             { label: "Tên", key: "givenName" },
             { label: "Mã học sinh", key: "code" },
-            { label: "Tên Thánh", key: "saintName" },
+
             { label: "Ngày sinh", render: (r) => fmtDate(r.dateOfBirth) },
             {
               label: "Lớp học",
@@ -159,7 +166,7 @@ export function CatalogPage({ type }) {
           ? [
               { label: "Họ và tên đệm", key: "familyName" },
               { label: "Tên", key: "givenName" },
-              { label: "Tên Thánh", key: "saintName" },
+
               {
                 label: "Tài khoản",
                 render: (r) => (
@@ -184,7 +191,8 @@ export function CatalogPage({ type }) {
                 ),
               },
             ];
-  if(type==="hocsinh"||type==="glv") cols.unshift({label:"Ảnh",render:r=><PersonAvatar kind={type==="glv"?"catechists":"students"} id={r.id} name={displayPerson(r)} revision={app.revision}/>});
+  if(type==="hocsinh"||type==="glv") cols.unshift({label:"Tên Thánh",key:"saintName"});
+  if(type==="hocsinh"||type==="glv") cols.unshift({label:"Ảnh",className:"avatar-column",render:r=><PersonAvatar kind={type==="glv"?"catechists":"students"} id={r.id} name={displayPerson(r)} revision={app.revision} hasAvatar={r.hasAvatar}/>});
   cols.push({
     label: "",
     render: (r) => (
@@ -246,6 +254,7 @@ export function CatalogPage({ type }) {
       </div>
     ),
   });
+  if(selecting)cols.unshift({className:"selection-column",label:<input className="check" type="checkbox" aria-label="Chọn tất cả trên trang" checked={rows.length>0&&rows.every(r=>selected.includes(r.id))} onChange={e=>setSelected(e.target.checked?rows.map(r=>r.id):[])}/>,render:r=><input className="check" type="checkbox" aria-label={'Chọn '+(r.name||displayPerson(r))} checked={selected.includes(r.id)} onChange={()=>toggle(r.id)}/>});
   return (
     <>
       <Head
@@ -258,13 +267,18 @@ export function CatalogPage({ type }) {
             {type === "lop" ? "Tạo lớp học" : "Thêm " + title.toLowerCase()}
           </Button>
         )}
+        {can(user,({lop:31,hocsinh:32,glv:33,namhoc:34})[type])&&<Button onClick={()=>{setSelecting(v=>!v);setSelected([])}}><Trash2/>{selecting?'Hủy chọn':'Xóa'}</Button>}
       </Head>
+      {selecting&&<div className="selection-toolbar" role="status"><span>Đã chọn {selected.length} · Chọn trong trang đang xem</span><Button disabled={!selected.length} onClick={()=>setConfirmDelete(true)}>Xóa ({selected.length})</Button></div>}
+      {confirmDelete&&<BulkDelete kind={kind} ids={selected} onClose={()=>setConfirmDelete(false)} onDeleted={()=>{setConfirmDelete(false);setSelecting(false);setSelected([]);app.refresh();app.toast('Đã xóa dữ liệu.')}}/>}
 
       <div className="filters">
+        {["hocsinh","glv"].includes(type)&&<div className="row" role="group" aria-label="Cách hiển thị"><Button title="Dạng danh sách" aria-label="Dạng danh sách" aria-pressed={view==='list'} primary={view==='list'} onClick={()=>setView('list')}><List/></Button><Button title="Dạng thẻ" aria-label="Dạng thẻ" aria-pressed={view==='cards'} primary={view==='cards'} onClick={()=>setView('cards')}><LayoutGrid/></Button></div>}
         <input
           className="input search"
           aria-label={"Tìm " + title.toLowerCase()}
           placeholder="Tìm tên hoặc mã…"
+          maxLength={120}
           value={search}
           onChange={(e) => {
             setSearch(e.target.value);
@@ -299,7 +313,7 @@ export function CatalogPage({ type }) {
         empty={!data.loading && !data.error && !rows.length}
         onRetry={data.reload}
       >
-        <Table rows={rows} columns={cols} />
+        {view==='cards'&&['hocsinh','glv'].includes(type)?<div className="person-grid">{rows.map(r=><article className="person-card" key={r.id}>{selecting&&<label className="row"><input className="check" type="checkbox" checked={selected.includes(r.id)} onChange={()=>toggle(r.id)} aria-label={'Chọn '+displayPerson(r)}/>Chọn xóa</label>}<PersonAvatar kind={kind} id={r.id} name={displayPerson(r)} revision={app.revision} hasAvatar={r.hasAvatar}/><h2>{displayPerson(r)}</h2><p>{r.code||('GLV-'+r.id.slice(0,8).toUpperCase())}</p>{type==='hocsinh'?<><p>{fmtDate(r.dateOfBirth)}</p><p>{r.enrollments?.map(e=>classes.find(c=>c.id===e.classRoomId)?.name).filter(Boolean).join(', ')||'Chưa có lớp'}</p></>:<p>{(data.data?.assignments||[]).filter(a=>a.catechistId===r.id).map(a=>classes.find(c=>c.id===a.classRoomId)?.name).filter(Boolean).join(', ')||'Chưa phân công'}</p>}<div className="person-actions">{cols.at(-1).render(r)}</div></article>)}</div>:<Table rows={rows} columns={cols} />}
       </State>
       {type === "glv" && can(user, 18) && <Assignments data={data.data} />}{" "}
       {edit && (

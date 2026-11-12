@@ -46,6 +46,7 @@ import {
 } from "./ui";
 import { ExcelActions, PresencePanel } from "./extensions";
 import {useApp,useData,query,nameCell,rate,Status,statusNames,permissionLabels,Editor,previewDays} from "./main";
+import BulkDelete from './BulkDelete';
 export function SessionScheduleEditor({session,onClose}) {
   const app=useApp(),local=s=>new Date(new Date(s.endsWith("Z")?s:s+"Z").getTime()+7*3600000).toISOString().slice(11,16);
   const [date,setDate]=useState(session.date),[open,setOpen]=useState(local(session.opensAtUtc)),[close,setClose]=useState(local(session.closesAtUtc)),[hs,setHs]=useState(session.studentAttendanceEnabled),[glv,setGlv]=useState(session.catechistAttendanceEnabled),[reason,setReason]=useState(""),[error,setError]=useState(""),[busy,setBusy]=useState(false);
@@ -53,6 +54,7 @@ export function SessionScheduleEditor({session,onClose}) {
   return <Modal title={"Chỉnh lịch · "+session.className+" · "+fmtDate(session.date)} onClose={()=>{if(!busy)onClose();}}><form onSubmit={save} className="stack"><p className="small muted">Giờ Việt Nam. Ngày giờ bắt đầu mới phải lớn hơn hiện tại.</p><label className="field">Ngày học<input type="date" className="input" required value={date} onChange={e=>setDate(e.target.value)}/></label><label className="field">Giờ bắt đầu<input className="input" required type="time" value={open} onChange={e=>setOpen(e.target.value)}/></label><label className="field">Giờ kết thúc<input className="input" required type="time" value={close} onChange={e=>setClose(e.target.value)}/></label><label className="row"><input type="checkbox" className="check" checked={hs} onChange={e=>setHs(e.target.checked)}/>HS — Điểm danh học sinh</label><label className="row"><input type="checkbox" className="check" checked={glv} onChange={e=>setGlv(e.target.checked)}/>GLV — Điểm danh giáo lý viên</label><label className="field">Lý do điều chỉnh<input className="input" required maxLength={500} value={reason} onChange={e=>setReason(e.target.value)}/></label>{error&&<p className="form-error" role="alert">{error}</p>}<div className="modal-actions"><Button disabled={busy} onClick={onClose}>Hủy</Button><Button primary type="submit" disabled={busy}>Lưu lịch</Button></div></form></Modal>;
 }
 export function Schedule() {
+  const [selecting,setSelecting]=useState(false),[selected,setSelected]=useState([]),[confirmDelete,setConfirmDelete]=useState(false);
   const app = useApp(),
     [edit, setEdit] = useState(null),
     [sessionEdit,setSessionEdit]=useState(null),
@@ -68,10 +70,10 @@ export function Schedule() {
     .toISOString()
     .slice(0, 10);
   const data = useData(
-      "/attendance-sessions?" + query({ from, until, classId: app.classId,yearId:app.yearId }),
+      app.yearId?"/attendance-sessions?" + query({ from, until, classId: app.classId,yearId:app.yearId }):null,
     ),
     schedules = useData(
-      "/catalog/schedules?" + query({ classId: app.classId,yearId:app.yearId }),
+      app.yearId?"/catalog/schedules?" + query({ classId: app.classId,yearId:app.yearId }):null,
     );
   const cls = app.classes.find((c) => c.id === app.classId),
     year = app.years.find((y) => y.id === cls?.academicYearId);
@@ -79,6 +81,11 @@ export function Schedule() {
     (s) => s.classRoomId === cls?.id,
   );
   const exceptionSchedule=schedules.data?.items?.find(s=>s.id===exception)||activeSchedule;
+  useEffect(()=>{setSelected([]);setSelecting(false)},[from,app.yearId,app.classId]);
+  const frames=schedules.data?.items||[],sessions=(data.data?.items||[]).filter(s=>!s.cancelled);
+  const groups=frames.map(frame=>({id:frame.id,frame,name:app.classes.find(c=>c.id===frame.classRoomId)?.name||'Khung lịch',children:sessions.filter(s=>s.scheduleId===frame.id)}));
+  const extra=sessions.filter(s=>!frames.some(f=>f.id===s.scheduleId));if(extra.length)groups.push({id:'extra',name:'Lịch bổ sung',children:extra});
+  function toggleFrame(group){setSelected(v=>v.includes(group.id)?v.filter(x=>x!==group.id):[...v.filter(x=>!group.children.some(s=>s.id===x)),group.id])}
   return (
     <>
       <Head
@@ -91,26 +98,7 @@ export function Schedule() {
             <Button disabled={!cls} onClick={() => setException(true)}>
               Ngày nghỉ / bổ sung
             </Button>
-            <Button
-              primary
-              disabled={!cls}
-              onClick={() =>
-                setEdit({
-                  ...activeSchedule,
-                  classRoomId: cls.id,
-                  from: activeSchedule?.from || year?.startDate || today(),
-                  until: activeSchedule?.until || year?.endDate || today(),
-                  daysMask: activeSchedule?.daysMask ?? 1,
-                  studentAttendanceEnabled: activeSchedule?.studentAttendanceEnabled ?? true,
-                  catechistAttendanceEnabled: activeSchedule?.catechistAttendanceEnabled ?? true,
-                  opensAt: activeSchedule?.opensAt?.slice(0, 5) || "09:00",
-                  closesAt: activeSchedule?.closesAt?.slice(0, 5) || "09:30",
-                })
-              }
-            >
-              <Settings2 />
-              Sửa khung đầu tiên
-            </Button>
+            <Button onClick={()=>{setSelecting(v=>!v);setSelected([])}}>{selecting?'Hủy chọn':'Xóa'}</Button>
           </>
         )}
       </Head>
@@ -130,32 +118,20 @@ export function Schedule() {
           label="Tháng xem lịch"
         />
       </div>
-      <State
-        {...data}
-        onRetry={data.reload}
-        empty={!data.loading && !data.error && !data.data?.items?.length}
-      >
-        <div className="card flush calendar-list">
-          {data.data?.items.map((s) => (
-            <div className={"calendar-row "+(highlighted===s.id?"updated-session":"")} key={s.id}>
-              <div className="datebox">
-                <small>{s.date.slice(5, 7)}</small>
-                <strong>{s.date.slice(8, 10)}</strong>
-              </div>
-              <div>
-                <h3>{s.className}</h3>
-                <p>
-                  {fmtTime(s.opensAtUtc)}–{fmtTime(s.closesAtUtc)}
-                </p>
-                <p>Điểm danh: {[s.studentAttendanceEnabled !== false && "HS", s.catechistAttendanceEnabled !== false && "GLV"].filter(Boolean).join(" + ")}</p>
-                {s.cancelled && <p>Buổi hủy · không tính chuyên cần</p>}
-              </div>
-              <div className="row wrap"><Status value={s.status} />{can(app.user,9)&&<Button className="sm" disabled={s.cancelled || new Date(s.opensAtUtc.endsWith("Z")?s.opensAtUtc:s.opensAtUtc+"Z").getTime()<=Date.now()} onClick={()=>setSessionEdit(s)}><Edit3/>Chỉnh lịch</Button>}</div>
-            </div>
-          ))}
-        </div>
-      </State>
-      <div className="stack">{schedules.data?.items?.map(s=><div className="row wrap" key={s.id}><span>{app.classes.find(c=>c.id===s.classRoomId)?.name} · {s.opensAt}–{s.closesAt}</span><Button onClick={()=>setEdit({...s,opensAt:s.opensAt.slice(0,5),closesAt:s.closesAt.slice(0,5)})}>Sửa khung lịch</Button><Button onClick={()=>setException(s.id)}>Nghỉ / bổ sung khung này</Button></div>)}</div>
+      {selecting&&<div className="selection-toolbar"><span>Đã chọn {selected.length}</span><Button disabled={!selected.length} onClick={()=>setConfirmDelete(true)}>Xóa ({selected.length})</Button></div>}
+      {confirmDelete&&<BulkDelete kind="schedule-items" ids={selected} onClose={()=>setConfirmDelete(false)} onDeleted={()=>{setSelected([]);setSelecting(false);setConfirmDelete(false);app.refresh()}}/>}
+      <State loading={data.loading||schedules.loading} error={data.error||schedules.error} onRetry={()=>{data.reload();schedules.reload()}} empty={!data.loading&&!schedules.loading&&!groups.length}>
+      <div className="schedule-tree">{groups.map(group=><section className="schedule-group" key={group.id}>
+        <div className="schedule-group-heading">{selecting&&group.frame&&<input type="checkbox" aria-label={'Chọn khung '+group.name} checked={selected.includes(group.id)} ref={el=>{if(el)el.indeterminate=!selected.includes(group.id)&&group.children.some(x=>selected.includes(x.id))}} onChange={()=>toggleFrame(group)}/>}
+        <details><summary><span><strong>{group.name}</strong>{group.frame&&<small>{fmtDate(group.frame.from)} – {fmtDate(group.frame.until)} · {group.frame.opensAt.slice(0,5)}–{group.frame.closesAt.slice(0,5)} · {['CN','T2','T3','T4','T5','T6','T7'].filter((_,i)=>group.frame.daysMask&(1<<i)).join(', ')} · {[group.frame.studentAttendanceEnabled&&'HS',group.frame.catechistAttendanceEnabled&&'GLV'].filter(Boolean).join(' + ')}</small>}<small>{group.children.length} buổi trong tháng đang xem</small></span><span aria-hidden="true">⌄</span></summary>
+        {group.frame&&can(app.user,9)&&<div className="row wrap schedule-tools"><Button onClick={()=>setEdit({...group.frame,opensAt:group.frame.opensAt.slice(0,5),closesAt:group.frame.closesAt.slice(0,5)})}>Sửa khung lịch</Button><Button onClick={()=>setException(group.id)}>Thêm lịch chi tiết / ngày nghỉ</Button></div>}
+        {!group.children.length&&<p>Chưa có buổi trong tháng này.</p>}
+        {group.children.map(s=><div className={'calendar-row '+(highlighted===s.id?'updated-session':'')} key={s.id}>
+          {selecting&&<input type="checkbox" aria-label={'Chọn buổi '+s.date+' '+fmtTime(s.opensAtUtc)} disabled={selected.includes(group.id)} checked={selected.includes(group.id)||selected.includes(s.id)} onChange={()=>setSelected(v=>v.includes(s.id)?v.filter(x=>x!==s.id):[...v,s.id])}/>}
+          <div className="datebox"><small>{s.date.slice(5,7)}</small><strong>{s.date.slice(8)}</strong></div><div><h3>{s.className}</h3><p>{fmtDate(s.date)} · {fmtTime(s.opensAtUtc)}–{fmtTime(s.closesAtUtc)}</p><p>{[s.studentAttendanceEnabled&&'HS',s.catechistAttendanceEnabled&&'GLV'].filter(Boolean).join(' + ')}</p></div><div className="row wrap"><Status value={s.status}/>{can(app.user,9)&&<Button disabled={s.cancelled||new Date(s.opensAtUtc.endsWith('Z')?s.opensAtUtc:s.opensAtUtc+'Z')<=new Date()} onClick={()=>setSessionEdit(s)}><Edit3/>Sửa lịch điểm danh</Button>}</div>
+        </div>)}
+        </details></div>
+      </section>)}</div></State>
       {sessionEdit&&<SessionScheduleEditor session={sessionEdit} onClose={date=>{if(typeof date==="string"){setFrom(date.slice(0,8)+"01");setHighlighted(sessionEdit.id);}setSessionEdit(null);}}/>}
       {edit && (
         <Editor
